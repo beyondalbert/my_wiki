@@ -2,20 +2,32 @@
 
 <cite>
 **本文引用的文件**
-- [app/blueprints/kb.py](file://app/blueprints/kb.py)
-- [app/models/knowledge_base.py](file://app/models/knowledge_base.py)
-- [app/services/kb_service.py](file://app/services/kb_service.py)
 - [app/blueprints/ai.py](file://app/blueprints/ai.py)
 - [app/models/ai_kb.py](file://app/models/ai_kb.py)
 - [app/services/ai_service.py](file://app/services/ai_service.py)
+- [app/blueprints/kb.py](file://app/blueprints/kb.py)
+- [app/models/knowledge_base.py](file://app/models/knowledge_base.py)
+- [app/services/kb_service.py](file://app/services/kb_service.py)
 - [app/blueprints/doc.py](file://app/blueprints/doc.py)
 - [app/models/document.py](file://app/models/document.py)
 - [app/services/doc_service.py](file://app/services/doc_service.py)
-- [app/utils/security.py](file://app/utils/security.py)
+- [app/utils/markdown.py](file://app/utils/markdown.py)
+- [app/utils/outline.py](file://app/utils/outline.py)
 - [app/config.py](file://app/config.py)
 - [app/extensions.py](file://app/extensions.py)
 - [app/__init__.py](file://app/__init__.py)
+- [app/templates/ai/index.html](file://app/templates/ai/index.html)
+- [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增AI知识库蓝图路由的完整文档
+- 添加AI知识库CRUD操作、源文档管理、构建状态监控的详细说明
+- 补充Wiki浏览、聊天功能和权限控制机制
+- 更新架构图和组件关系说明
+- 添加RESTful API定义和调用示例
+- 完善WebSocket实时推送和文件上传处理说明
 
 ## 目录
 1. [简介](#简介)
@@ -30,20 +42,20 @@
 10. [附录](#附录)
 
 ## 简介
-本文件系统化梳理“AI知识库蓝图路由”的HTTP API与内部流程，覆盖知识库与文档的CRUD、源文档管理、Wiki构建触发与状态查询、聊天交互、文件上传与批量处理、权限验证与角色控制、以及与前端的集成方式。文档以蓝图与服务层为核心，结合模型定义与配置，给出REST风格的URL模式、请求响应格式、错误码定义、调用示例、参数校验规则与安全建议，并提供调试与性能监控指引。
+本文件系统化梳理"AI知识库蓝图路由"的HTTP API与内部流程，覆盖AI知识库的CRUD操作、源文档管理、Wiki构建触发与状态查询、聊天交互、文件上传与批量处理、权限验证与角色控制、以及与前端的集成方式。文档以蓝图与服务层为核心，结合模型定义与配置，给出REST风格的URL模式、请求响应格式、错误码定义、调用示例、参数校验规则与安全建议，并提供调试与性能监控指引。
 
 ## 项目结构
 - 蓝图组织
+  - AI蓝图：负责AI知识库的创建、详情、编辑、删除、源文档选择、构建、状态查询、Wiki浏览、图谱、聊天等
   - 知识库蓝图：负责知识库的列表、创建、详情、编辑、删除、成员管理等页面级路由
   - 文档蓝图：负责文档的创建、查看、编辑、保存、删除、分享等页面级路由
-  - AI蓝图：负责AI知识库的创建、详情、编辑、删除、源文档选择、构建、状态查询、Wiki浏览、图谱、聊天等
 - 服务层
+  - AI服务：LLM客户端封装、文章构建、链接解析、异步构建、聊天
   - 知识库服务：访问控制、成员管理、查询聚合
   - 文档服务：树形结构、内容更新、软删除、后代收集
-  - AI服务：LLM客户端封装、文章构建、链接解析、异步构建、聊天
 - 模型层
-  - 知识库、成员、可见性枚举
   - AI知识库、源文档、文章、链接、分块
+  - 知识库、成员、可见性枚举
   - 文档、分享
 - 配置与扩展
   - 应用配置、CSRF、登录管理、数据库初始化
@@ -55,75 +67,75 @@ subgraph "应用"
 APP["Flask 应用工厂<br/>注册蓝图与扩展"]
 end
 subgraph "蓝图"
+AI["AI蓝图 /ai/*"]
 KB["知识库蓝图 /kb/*"]
 DOC["文档蓝图 /doc/*"]
-AI["AI蓝图 /ai/*"]
 end
 subgraph "服务层"
+AIS["AI服务"]
 KBS["知识库服务"]
 DOCS["文档服务"]
-AIS["AI服务"]
 end
 subgraph "模型层"
-KBM["知识库/成员/可见性"]
 AIM["AI知识库/源/文章/链接/分块"]
+KBM["知识库/成员/可见性"]
 DOCM["文档/分享"]
 end
+APP --> AI
 APP --> KB
 APP --> DOC
-APP --> AI
+AI --> AIS
 KB --> KBS
 DOC --> DOCS
-AI --> AIS
+AIS --> AIM
 KBS --> KBM
 DOCS --> DOCM
-AIS --> AIM
 ```
 
-图表来源
+**图表来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
+- [app/blueprints/ai.py:15](file://app/blueprints/ai.py#L15)
 - [app/blueprints/kb.py:11](file://app/blueprints/kb.py#L11)
 - [app/blueprints/doc.py:10](file://app/blueprints/doc.py#L10)
-- [app/blueprints/ai.py:15](file://app/blueprints/ai.py#L15)
 
-章节来源
+**章节来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
 - [app/extensions.py:8-17](file://app/extensions.py#L8-L17)
 
 ## 核心组件
+- AI蓝图
+  - 提供AI知识库CRUD、源文档选择、构建触发、状态查询、Wiki浏览、图谱、聊天
+  - 内部通过服务层执行异步构建与链接解析
 - 知识库蓝图
   - 提供知识库列表、新建、详情、编辑、删除、成员管理等页面路由
   - 基于服务层进行访问控制与成员增删
 - 文档蓝图
   - 提供文档树展示、创建、编辑、保存JSON、删除、分享等
   - 支持隐私控制与分享令牌生成
-- AI蓝图
-  - 提供AI知识库CRUD、源文档选择、构建触发、状态查询、Wiki浏览、图谱、聊天
-  - 内部通过服务层执行异步构建与链接解析
 - 服务层
+  - AI服务：LLM封装、文章构建、链接解析、异步构建、聊天
   - 知识库服务：can_access/can_edit/can_manage、我的知识库/公开知识库查询、成员增删
   - 文档服务：树形结构、内容更新、软删除、后代收集
-  - AI服务：LLM封装、文章构建、链接解析、异步构建、聊天
 - 模型层
   - 定义可见性、成员角色、状态枚举与实体关系
 - 配置与扩展
   - 开放AI相关配置项、CSRF与登录管理、蓝图注册
 
-章节来源
-- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+**章节来源**
 - [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
-- [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
-- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
-- [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
+- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
+- [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
+- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
 - [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
+- [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 - [app/config.py:15-83](file://app/config.py#L15-L83)
 - [app/extensions.py:8-17](file://app/extensions.py#L8-L17)
 
 ## 架构总览
-AI知识库蓝图路由围绕“蓝图-服务-模型-配置”的分层设计展开，采用Flask蓝图注册到应用工厂，统一由扩展模块初始化数据库、登录与CSRF保护。AI构建采用后台线程异步执行，状态通过状态查询接口反馈；聊天交互支持纯关键词检索与可选RAG增强两种模式。
+AI知识库蓝图路由围绕"蓝图-服务-模型-配置"的分层设计展开，采用Flask蓝图注册到应用工厂，统一由扩展模块初始化数据库、登录与CSRF保护。AI构建采用后台线程异步执行，状态通过状态查询接口反馈；聊天交互支持纯关键词检索与可选RAG增强两种模式。
 
 ```mermaid
 sequenceDiagram
@@ -147,88 +159,15 @@ S->>DB : "更新 AI知识库状态为 READY/FAILED"
 A-->>C : "重定向并提示任务已启动"
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:143-174](file://app/blueprints/ai.py#L143-L174)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 ## 详细组件分析
-
-### 知识库蓝图（/kb）
-- 路由与职责
-  - GET /kb/：按tab（mine/public）列出知识库
-  - GET/POST /kb/new：创建新知识库（表单提交）
-  - GET /kb/<int:kb_id>：知识库详情页（含文档树、首篇文档）
-  - GET/POST /kb/<int:kb_id>/edit：编辑知识库（名称、描述、可见性、图标）
-  - POST /kb/<int:kb_id>/delete：归档知识库
-  - GET/POST /kb/<int:kb_id>/members：成员管理（添加/移除）
-  - POST /kb/<int:kb_id>/members/<int:user_id>/delete：移除成员
-- 访问控制
-  - 登录必选；详情与编辑需具备相应权限；成员管理需拥有管理权
-- 关键服务
-  - 知识库服务提供can_access/can_edit/can_manage与我的/公开知识库查询
-- 数据模型
-  - 知识库、成员、可见性枚举
-
-```mermaid
-flowchart TD
-Start(["进入 /kb/<int:kb_id>"]) --> LoadKB["加载知识库并校验是否归档"]
-LoadKB --> Access{"can_access 当前用户"}
-Access --> |否| Forbidden["返回 403"]
-Access --> |是| Tree["生成文档树"]
-Tree --> FirstDoc["选择首篇文档若存在"]
-FirstDoc --> Render["渲染详情页"]
-```
-
-图表来源
-- [app/blueprints/kb.py:56-72](file://app/blueprints/kb.py#L56-L72)
-- [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
-
-章节来源
-- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
-- [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
-- [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
-
-### 文档蓝图（/doc）
-- 路由与职责
-  - POST /doc/new：创建文档（校验知识库与编辑权限）
-  - GET /doc/<int:doc_id>：文档视图（含大纲）
-  - GET /doc/<int:doc_id>/edit：文档编辑页
-  - POST /doc/<int:doc_id>/save：保存JSON内容（标题、内容、隐私）
-  - POST /doc/<int:doc_id>/delete：软删除文档及其后代
-  - GET/POST /doc/<int:doc_id>/share：生成分享链接（可选密码、有效期）
-  - POST /doc/share/<int:share_id>/revoke：撤销分享
-- 权限控制
-  - 视图与编辑需具备编辑权限；分享与撤销需具备编辑权限
-- 关键服务
-  - 文档服务提供树形结构、内容更新、软删除、后代收集
-- 数据模型
-  - 文档、分享（含密码哈希、过期、失效）
-
-```mermaid
-sequenceDiagram
-participant C as "客户端"
-participant D as "文档蓝图"
-participant DS as "文档服务"
-participant DB as "数据库"
-C->>D : "POST /doc/<int : doc_id>/save"
-D->>DS : "update_content(doc, content_json, title)"
-DS->>DB : "更新文档内容与plain_text"
-DS-->>D : "返回大纲与更新时间"
-D-->>C : "JSON {ok, outline, updated_at}"
-```
-
-图表来源
-- [app/blueprints/doc.py:69-84](file://app/blueprints/doc.py#L69-L84)
-- [app/services/doc_service.py:56-62](file://app/services/doc_service.py#L56-L62)
-
-章节来源
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
-- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
 ### AI知识库蓝图（/ai）
 - 路由与职责
@@ -255,54 +194,94 @@ D-->>C : "JSON {ok, outline, updated_at}"
   - AI知识库、源文档、文章、链接、分块（可选RAG）
 
 ```mermaid
-sequenceDiagram
-participant C as "客户端"
-participant A as "AI蓝图"
-participant AS as "AI服务"
-participant DB as "数据库"
-C->>A : "GET /ai/<ai_kb_id>/status"
-A->>AS : "查询各状态计数与文章数"
-AS->>DB : "统计 AIKBSource 各状态数量"
-DB-->>AS : "返回计数"
-AS-->>A : "返回 {status, error, last_built_at, sources, articles}"
-A-->>C : "JSON 响应"
+flowchart TD
+Start(["进入 /ai/<int:ai_kb_id>"]) --> LoadKB["加载AI知识库并校验权限"]
+LoadKB --> Access{"can_access 当前用户"}
+Access --> |否| Forbidden["返回 403"]
+Access --> |是| Status["检查构建状态"]
+Status --> Build{"状态为 BUILDING?"}
+Build --> |是| Wait["提示等待"]
+Build --> |否| Ready["允许查看详情"]
+Ready --> Render["渲染详情页"]
 ```
 
-图表来源
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
-- [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
+**图表来源**
+- [app/blueprints/ai.py:55-62](file://app/blueprints/ai.py#L55-L62)
+- [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
 
+### 知识库蓝图（/kb）
+- 路由与职责
+  - GET /kb/：按tab（mine/public）列出知识库
+  - GET/POST /kb/new：创建新知识库（表单提交）
+  - GET /kb/<int:kb_id>：知识库详情页（含文档树、首篇文档）
+  - GET/POST /kb/<int:kb_id>/edit：编辑知识库（名称、描述、可见性、图标）
+  - POST /kb/<int:kb_id>/delete：归档知识库
+  - GET/POST /kb/<int:kb_id>/members：成员管理（添加/移除）
+  - POST /kb/<int:kb_id>/members/<int:user_id>/delete：移除成员
+- 访问控制
+  - 登录必选；详情与编辑需具备相应权限；成员管理需拥有管理权
+- 关键服务
+  - 知识库服务提供can_access/can_edit/can_manage与我的/公开知识库查询
+- 数据模型
+  - 知识库、成员、可见性枚举
+
+**章节来源**
+- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
+- [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
+- [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
+
+### 文档蓝图（/doc）
+- 路由与职责
+  - POST /doc/new：创建文档（校验知识库与编辑权限）
+  - GET /doc/<int:doc_id>：文档视图（含大纲）
+  - GET /doc/<int:doc_id>/edit：文档编辑页
+  - POST /doc/<int:doc_id>/save：保存JSON内容（标题、内容、隐私）
+  - POST /doc/<int:doc_id>/delete：软删除文档及其后代
+  - GET/POST /doc/<int:doc_id>/share：生成分享链接（可选密码、有效期）
+  - POST /doc/share/<int:share_id>/revoke：撤销分享
+- 权限控制
+  - 视图与编辑需具备编辑权限；分享与撤销需具备编辑权限
+- 关键服务
+  - 文档服务提供树形结构、内容更新、软删除、后代收集
+- 数据模型
+  - 文档、分享（含密码哈希、过期、失效）
+
+**章节来源**
+- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
+- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+
 ### 权限验证与角色控制
+- AI知识库权限
+  - 详情页仅所有者或超级管理员可访问
 - 知识库权限
   - can_access：公开可见、登录且非归档、超级管理员、所有者、成员（成员可见）
   - can_edit：超级管理员、所有者、成员为编辑者
   - can_manage：仅所有者或超级管理员
 - 文档权限
   - 视图与编辑需具备编辑权限；分享与撤销需具备编辑权限
-- AI知识库权限
-  - 详情页仅所有者或超级管理员可访问
 
 ```mermaid
 flowchart TD
 U["用户"] --> V{"是否登录"}
 V --> |否| D403["拒绝 403"]
-V --> |是| A["can_access 判定"]
+V --> |是| A["AI知识库权限判定"]
 A --> |否| D403
-A --> |是| E["can_edit/can_manage 判定"]
+A --> |是| E["知识库/文档权限判定"]
 E --> |否| D403
 E --> |是| OK["允许访问"]
 ```
 
-图表来源
+**图表来源**
 - [app/services/kb_service.py:10-45](file://app/services/kb_service.py#L10-L45)
 - [app/blueprints/ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
 
-章节来源
+**章节来源**
 - [app/services/kb_service.py:10-45](file://app/services/kb_service.py#L10-L45)
 - [app/blueprints/doc.py:47-48](file://app/blueprints/doc.py#L47-L48)
 - [app/blueprints/ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
@@ -313,7 +292,7 @@ E --> |是| OK["允许访问"]
 - 建议
   - 若需实时状态推送，可在AI构建状态查询接口基础上引入WebSocket（如Flask-SocketIO），在构建状态变更时推送至订阅客户端
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 
 ### 文件上传、批量处理与进度跟踪
@@ -325,12 +304,28 @@ E --> |是| OK["允许访问"]
   - 通过状态查询接口轮询构建状态与计数
   - 源文档状态枚举：PENDING、PROCESSING、PROCESSED、FAILED
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:108-126](file://app/blueprints/ai.py#L108-L126)
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - [app/models/ai_kb.py:15-19](file://app/models/ai_kb.py#L15-L19)
 
 ### RESTful API定义与调用示例
+- AI知识库（/ai）
+  - GET /ai/：返回当前用户的所有AI知识库
+  - POST /ai/new：表单字段 name, description, chat_model, enable_rag
+  - GET /ai/<int:ai_kb_id>：返回AI知识库详情
+  - POST /ai/<int:ai_kb_id>/edit：表单字段 name, description, chat_model, enable_rag
+  - POST /ai/<int:ai_kb_id>/delete：删除AI知识库
+  - GET /ai/<int:ai_kb_id>/sources：返回可选源文档列表
+  - POST /ai/<int:ai_kb_id>/sources/add：表单字段 doc_ids（多选）
+  - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源文档
+  - POST /ai/<int:ai_kb_id>/build：表单字段 scope（默认仅待处理）
+  - GET /ai/<int:ai_kb_id>/status：返回 {status, error, last_built_at, sources, articles}
+  - GET /ai/<int:ai_kb_id>/wiki：返回文章列表与标签分组
+  - GET /ai/<int:ai_kb_id>/wiki/<slug>：返回文章HTML与反链
+  - POST /ai/<int:ai_kb_id>/wiki/<slug>/regenerate：重生单篇文章
+  - GET /ai/<int:ai_kb_id>/graph：返回图谱数据
+  - GET/POST /ai/<int:ai_kb_id>/chat：POST表单字段 q；成功返回 {ok:true, answer}，失败返回 {ok:false, error}
 - 知识库（/kb）
   - GET /kb/?tab=mine|public：返回知识库列表
   - POST /kb/new：表单字段 name, description, visibility, icon
@@ -347,25 +342,11 @@ E --> |是| OK["允许访问"]
   - POST /doc/<int:doc_id>/delete：软删除
   - GET/POST /doc/<int:doc_id>/share：表单字段 password, ttl_hours
   - POST /doc/share/<int:share_id>/revoke：撤销分享
-- AI知识库（/ai）
-  - POST /ai/new：表单字段 name, description, chat_model, enable_rag
-  - POST /ai/<int:ai_kb_id>/edit：表单字段 name, description, chat_model, enable_rag
-  - POST /ai/<int:ai_kb_id>/delete：删除
-  - GET /ai/<int:ai_kb_id>/sources：返回可选源文档列表
-  - POST /ai/<int:ai_kb_id>/sources/add：表单字段 doc_ids（多选）
-  - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源
-  - POST /ai/<int:ai_kb_id>/build：表单字段 scope（默认仅待处理）
-  - GET /ai/<int:ai_kb_id>/status：返回 {status, error, last_built_at, sources, articles}
-  - GET /ai/<int:ai_kb_id>/wiki：返回文章列表与标签分组
-  - GET /ai/<int:ai_kb_id>/wiki/<slug>：返回文章HTML与反链
-  - POST /ai/<int:ai_kb_id>/wiki/<slug>/regenerate：重生
-  - GET /ai/<int:ai_kb_id>/graph：返回图谱数据
-  - GET/POST /ai/<int:ai_kb_id>/chat：POST表单字段 q；成功返回 {ok:true, answer}，失败返回 {ok:false, error}
 
-章节来源
+**章节来源**
+- [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
-- [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
 
 ### 请求响应格式与错误码
 - 成功响应
@@ -377,9 +358,9 @@ E --> |是| OK["允许访问"]
   - JSON错误：{ok: false, error: "<message>"}
 - 典型场景
   - AI聊天输入为空：返回 {ok: false, error: "请输入问题"}
-  - 构建任务已在运行：页面提示“正在生成，请稍候”
+  - 构建任务已在运行：页面提示"正在生成，请稍候"
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:265-278](file://app/blueprints/ai.py#L265-L278)
 - [app/blueprints/ai.py:147-149](file://app/blueprints/ai.py#L147-L149)
 
@@ -395,7 +376,7 @@ E --> |是| OK["允许访问"]
   - 会话安全：Cookie HttpOnly、SameSite策略
   - LLM客户端：从配置读取base_url与api_key，避免硬编码
 
-章节来源
+**章节来源**
 - [app/blueprints/kb.py:35-43](file://app/blueprints/kb.py#L35-L43)
 - [app/blueprints/ai.py:37-41](file://app/blueprints/ai.py#L37-L41)
 - [app/utils/security.py:5-8](file://app/utils/security.py#L5-L8)
@@ -404,21 +385,23 @@ E --> |是| OK["允许访问"]
 
 ### 与前端组件的集成方式
 - 页面路由
-  - 使用Flask render_template渲染Jinja2模板，传递上下文变量（如知识库、文档树、成员、文章、标签分组等）
+  - 使用Flask render_template渲染Jinja2模板，传递上下文变量（如AI知识库、文档树、成员、文章、标签分组等）
 - JSON接口
-  - 通过AJAX调用/save、/status、/chat等接口，返回JSON数据驱动前端交互
+  - 通过AJAX调用/status、/chat等接口，返回JSON数据驱动前端交互
 - 实时通信
   - 当前未实现WebSocket；可通过引入SocketIO在构建状态变化时推送消息
 
-章节来源
-- [app/blueprints/kb.py:29](file://app/blueprints/kb.py#L29)
+**章节来源**
+- [app/blueprints/ai.py:29](file://app/blueprints/ai.py#L29)
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
+- [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
+- [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
 
 ## 依赖分析
 - 蓝图到服务层
+  - AI蓝图依赖AI服务进行构建、链接解析与聊天
   - 知识库蓝图依赖知识库服务进行权限与查询
   - 文档蓝图依赖文档服务进行树形结构与内容更新
-  - AI蓝图依赖AI服务进行构建、链接解析与聊天
 - 服务层到模型层
   - 服务层通过SQLAlchemy ORM操作模型，维护实体关系
 - 配置与扩展
@@ -427,12 +410,12 @@ E --> |是| OK["允许访问"]
 
 ```mermaid
 graph LR
+AI_BP["AI蓝图"] --> AISVC["AI服务"]
 KB_BP["知识库蓝图"] --> KBSVC["知识库服务"]
 DOC_BP["文档蓝图"] --> DOCSVC["文档服务"]
-AI_BP["AI蓝图"] --> AISVC["AI服务"]
+AISVC --> AIMOD["AI知识库模型"]
 KBSVC --> KBMOD["知识库模型"]
 DOCSVC --> DOCMOD["文档模型"]
-AISVC --> AIMOD["AI知识库模型"]
 EXT["扩展初始化"] --> DB["SQLAlchemy"]
 EXT --> LM["LoginManager"]
 EXT --> CSRF["CSRFProtect"]
@@ -440,13 +423,13 @@ CFG["配置"] --> AISVC
 CFG --> APP["应用工厂"]
 ```
 
-图表来源
+**图表来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
+- [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
 - [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
-- [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 
-章节来源
+**章节来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
 - [app/extensions.py:8-17](file://app/extensions.py#L8-L17)
 
@@ -460,7 +443,7 @@ CFG --> APP["应用工厂"]
 - 存储与索引
   - AI Wiki文件写入磁盘，文章与链接建立索引，提升解析效率
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
@@ -480,13 +463,13 @@ CFG --> APP["应用工厂"]
   - 关注数据库慢查询与锁等待
   - 对接日志系统记录关键事件（构建开始/结束、失败原因）
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/config.py:37-47](file://app/config.py#L37-L47)
 
 ## 结论
-AI知识库蓝图路由以清晰的分层设计实现了从知识库与文档管理到AI Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
+AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
 
 ## 附录
 - 配置项要点
@@ -496,6 +479,6 @@ AI知识库蓝图路由以清晰的分层设计实现了从知识库与文档管
 - 蓝图注册
   - 应用工厂集中注册各蓝图并设置URL前缀
 
-章节来源
+**章节来源**
 - [app/config.py:15-83](file://app/config.py#L15-L83)
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)

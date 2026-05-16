@@ -6,15 +6,23 @@
 - [ai.py](file://app/blueprints/ai.py)
 - [ai_kb.py](file://app/models/ai_kb.py)
 - [knowledge_base.py](file://app/models/knowledge_base.py)
-- [kb_service.py](file://app/services/kb_service.py)
+- [document.py](file://app/models/document.py)
 - [markdown.py](file://app/utils/markdown.py)
 - [outline.py](file://app/utils/outline.py)
-- [document.py](file://app/models/document.py)
 - [config.py](file://app/config.py)
-- [__init__.py](file://app/__init__.py)
-- [run.py](file://run.py)
 - [requirements.txt](file://requirements.txt)
+- [detail.html](file://app/templates/ai/detail.html)
+- [wiki_home.html](file://app/templates/ai/wiki_home.html)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增LLM客户端封装模块，提供OpenAI兼容SDK集成
+- 实现文章草稿构建系统，支持JSON格式输出和字段清洗
+- 建立文章写盘机制，包含Frontmatter生成和文件落盘
+- 完善链接解析与回链系统，支持别名索引和双向链接
+- 开发异步构建与再生流水线，支持后台线程处理
+- 集成对话问答功能，支持关键词重叠检索和RAG增强
 
 ## 目录
 1. [简介](#简介)
@@ -29,7 +37,7 @@
 10. [附录](#附录)
 
 ## 简介
-本项目提供“基于Karpathy LLM Wiki方法论”的AI知识库服务，支持：
+本项目提供"基于Karpathy LLM Wiki方法论"的AI知识库服务，支持：
 - 文档到Markdown Wiki条目的转换与统一模板化
 - Wiki链接解析与反链构建，形成双向超链接图谱
 - 基于关键词重叠的简单检索与问答（可选RAG增强）
@@ -82,7 +90,7 @@ Factory --> Cfg
 Factory --> Req
 ```
 
-图表来源
+**图表来源**
 - [run.py:1-17](file://run.py#L1-L17)
 - [__init__.py:11-28](file://app/__init__.py#L11-L28)
 - [ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
@@ -95,7 +103,7 @@ Factory --> Req
 - [config.py:1-83](file://app/config.py#L1-L83)
 - [requirements.txt:1-22](file://requirements.txt#L1-L22)
 
-章节来源
+**章节来源**
 - [run.py:1-17](file://run.py#L1-L17)
 - [__init__.py:11-28](file://app/__init__.py#L11-L28)
 - [ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
@@ -117,7 +125,7 @@ Factory --> Req
 - 蓝图路由：提供知识库创建、编辑、构建、浏览、图谱、聊天等接口。
 - 模型与数据：AI知识库、源文档、文章、链接、可选分片等模型定义。
 
-章节来源
+**章节来源**
 - [ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
@@ -127,7 +135,7 @@ Factory --> Req
 - [ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
 
 ## 架构总览
-系统采用“蓝图+服务层+模型层+工具层”的分层设计，AI知识库功能由蓝图路由触发，服务层完成LLM调用、内容处理与状态管理，模型层持久化数据，工具层提供Markdown与内容解析能力。
+系统采用"蓝图+服务层+模型层+工具层"的分层设计，AI知识库功能由蓝图路由触发，服务层完成LLM调用、内容处理与状态管理，模型层持久化数据，工具层提供Markdown与内容解析能力。
 
 ```mermaid
 graph TB
@@ -143,7 +151,7 @@ Models --> DB["数据库"]
 LLM --> OpenAI["外部LLM服务"]
 ```
 
-图表来源
+**图表来源**
 - [ai.py:176-279](file://app/blueprints/ai.py#L176-L279)
 - [ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
@@ -175,10 +183,10 @@ class LLMClient {
 }
 ```
 
-图表来源
+**图表来源**
 - [ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 
-章节来源
+**章节来源**
 - [ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [ai_service.py:92-119](file://app/services/ai_service.py#L92-L119)
 - [ai_service.py:388-407](file://app/services/ai_service.py#L388-L407)
@@ -202,13 +210,13 @@ Upsert --> WriteFile["写入Markdown文件"]
 WriteFile --> End(["结束"])
 ```
 
-图表来源
+**图表来源**
 - [ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [outline.py:58-87](file://app/utils/outline.py#L58-L87)
 - [outline.py:90-136](file://app/utils/outline.py#L90-L136)
 
-章节来源
+**章节来源**
 - [ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [outline.py:58-87](file://app/utils/outline.py#L58-L87)
@@ -237,12 +245,12 @@ end
 Svc-->>Svc : 返回解析统计
 ```
 
-图表来源
+**图表来源**
 - [ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 - [ai_service.py:237-248](file://app/services/ai_service.py#L237-L248)
 - [markdown.py:69-86](file://app/utils/markdown.py#L69-L86)
 
-章节来源
+**章节来源**
 - [ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 - [ai_service.py:237-248](file://app/services/ai_service.py#L237-L248)
 - [markdown.py:69-86](file://app/utils/markdown.py#L69-L86)
@@ -271,13 +279,13 @@ Th->>Svc : 执行链接解析
 Th->>DB : 设置知识库状态=就绪/失败
 ```
 
-图表来源
+**图表来源**
 - [ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [ai_service.py:347-381](file://app/services/ai_service.py#L347-L381)
 
-章节来源
+**章节来源**
 - [ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
@@ -300,10 +308,10 @@ Context --> CallLLM["调用LLM回答"]
 CallLLM --> Answer["返回答案"]
 ```
 
-图表来源
+**图表来源**
 - [ai_service.py:391-407](file://app/services/ai_service.py#L391-L407)
 
-章节来源
+**章节来源**
 - [ai_service.py:391-407](file://app/services/ai_service.py#L391-L407)
 - [ai_kb.py:30-31](file://app/models/ai_kb.py#L30-L31)
 - [config.py:37-47](file://app/config.py#L37-L47)
@@ -330,11 +338,11 @@ S-->>BP : 返回答案
 BP-->>U : JSON {ok, answer/error}
 ```
 
-图表来源
+**图表来源**
 - [ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
 - [ai_service.py:391-407](file://app/services/ai_service.py#L391-L407)
 
-章节来源
+**章节来源**
 - [ai.py:27-85](file://app/blueprints/ai.py#L27-L85)
 - [ai.py:90-139](file://app/blueprints/ai.py#L90-L139)
 - [ai.py:176-279](file://app/blueprints/ai.py#L176-L279)
@@ -357,11 +365,11 @@ App -.可选.-> Chroma["chromadb"]
 App -.可选.-> Tiktoken["tiktoken"]
 ```
 
-图表来源
+**图表来源**
 - [requirements.txt:1-22](file://requirements.txt#L1-L22)
 - [config.py:37-47](file://app/config.py#L37-L47)
 
-章节来源
+**章节来源**
 - [requirements.txt:1-22](file://requirements.txt#L1-L22)
 - [config.py:37-47](file://app/config.py#L37-L47)
 
@@ -379,7 +387,7 @@ App -.可选.-> Tiktoken["tiktoken"]
 - 红链检测：链接解析后可统计红链数量，辅助识别未解析的目标。
 - 配置检查：确认OPENAI_BASE_URL、OPENAI_API_KEY、CHAT_MODEL、AI_WIKI_DIR等环境变量正确。
 
-章节来源
+**章节来源**
 - [ai_service.py:66-70](file://app/services/ai_service.py#L66-L70)
 - [ai_service.py:307-310](file://app/services/ai_service.py#L307-L310)
 - [ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
@@ -398,10 +406,12 @@ App -.可选.-> Tiktoken["tiktoken"]
   - 查看图谱：GET /ai/<id>/graph。
   - 聊天问答：GET /ai/<id>/chat 或 POST /ai/<id>/chat?q=...
 
-章节来源
+**章节来源**
 - [ai.py:34-52](file://app/blueprints/ai.py#L34-L52)
 - [ai.py:90-126](file://app/blueprints/ai.py#L90-L126)
 - [ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [ai.py:194-236](file://app/blueprints/ai.py#L194-L236)
 - [ai.py:251-260](file://app/blueprints/ai.py#L251-L260)
 - [ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
+- [detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
+- [wiki_home.html:1-52](file://app/templates/ai/wiki_home.html#L1-L52)

@@ -2,17 +2,30 @@
 
 <cite>
 **本文档引用的文件**
+- [app/blueprints/ai.py](file://app/blueprints/ai.py)
 - [app/models/ai_kb.py](file://app/models/ai_kb.py)
 - [app/models/knowledge_base.py](file://app/models/knowledge_base.py)
 - [app/models/document.py](file://app/models/document.py)
 - [app/services/ai_service.py](file://app/services/ai_service.py)
 - [app/services/kb_service.py](file://app/services/kb_service.py)
-- [app/blueprints/ai.py](file://app/blueprints/ai.py)
 - [app/utils/markdown.py](file://app/utils/markdown.py)
 - [app/utils/outline.py](file://app/utils/outline.py)
 - [app/config.py](file://app/config.py)
 - [requirements.txt](file://requirements.txt)
+- [app/templates/ai/index.html](file://app/templates/ai/index.html)
+- [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
+- [app/templates/ai/wiki_home.html](file://app/templates/ai/wiki_home.html)
+- [app/templates/ai/wiki_article.html](file://app/templates/ai/wiki_article.html)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 新增完整的AI知识库蓝图实现，包含完整的CRUD操作和路由定义
+- 更新数据模型文档，包含AI知识库、源文档、文章、链接、片段的完整设计
+- 新增服务层文档，涵盖LLM客户端、Wiki构建器、链接解析器等核心组件
+- 新增前端模板文档，包含AI知识库的完整UI界面
+- 更新架构图和流程图，反映新的模块化设计
+- 新增API接口文档和前端模板说明
 
 ## 目录
 1. [简介](#简介)
@@ -20,42 +33,50 @@
 3. [核心组件](#核心组件)
 4. [架构总览](#架构总览)
 5. [详细组件分析](#详细组件分析)
-6. [依赖分析](#依赖分析)
-7. [性能考虑](#性能考虑)
-8. [故障排除指南](#故障排除指南)
-9. [结论](#结论)
-10. [附录](#附录)
+6. [前端模板系统](#前端模板系统)
+7. [API接口文档](#api接口文档)
+8. [依赖分析](#依赖分析)
+9. [性能考虑](#性能考虑)
+10. [故障排除指南](#故障排除指南)
+11. [结论](#结论)
+12. [附录](#附录)
 
 ## 简介
-本模块实现了基于 Andrej Karpathy LLM Wiki 方法论的 AI 知识库系统，支持将多源文档转换为结构化的 Markdown 条目，通过双向链接构建知识图谱，并提供两种问答模式：纯关键词检索增强的问答（默认）与可选的向量检索增强（RAG）。系统采用 Flask + SQLAlchemy 架构，结合 OpenAI 兼容 API 进行内容改写与对话，同时保留纯文本/Markdown 的轻量存储方案。
+本模块实现了基于 Andrej Karpathy LLM Wiki 方法论的完整AI知识库系统，支持将多源文档转换为结构化的Markdown条目，通过双向链接构建知识图谱，并提供两种问答模式：纯关键词检索增强的问答（默认）与可选的向量检索增强（RAG）。系统采用Flask + SQLAlchemy架构，结合OpenAI兼容API进行内容改写与对话，同时保留纯文本/Markdown的轻量存储方案。
+
+**更新** 新增完整的AI知识库蓝图实现，包含用户认证、权限控制、异步构建流程和完整的前端模板系统。
 
 ## 项目结构
-- 蓝图层：路由定义与权限控制，负责接收请求、调用服务层并渲染模板。
-- 服务层：AI 核心逻辑（LLM 客户端、Wiki 构建器、链接解析器、异步构建流水线、问答接口）。
-- 工具层：Markdown 渲染、Wiki 链接收集与重写、Editor.js 内容提取。
-- 模型层：AI 知识库实体及其关系（知识库、源文档、文章、链接、片段）。
-- 配置层：应用配置与环境变量（OpenAI、聊天模型、AI Wiki 存储路径、可选 RAG 参数）。
+- **蓝图层**：AI知识库蓝图实现，包含完整的路由定义、权限控制和业务逻辑
+- **服务层**：AI核心逻辑（LLM客户端、Wiki构建器、链接解析器、异步构建流水线、问答接口）
+- **工具层**：Markdown渲染、Wiki链接收集与重写、Editor.js内容提取
+- **模型层**：AI知识库实体及其关系（知识库、源文档、文章、链接、片段）
+- **配置层**：应用配置与环境变量（OpenAI、聊天模型、AI Wiki存储路径、可选RAG参数）
+- **模板层**：完整的前端模板系统，包含AI知识库的所有UI界面
 
 ```mermaid
 graph TB
 subgraph "蓝图层"
-BP_AI["蓝图: ai.py"]
+BP_AI["蓝图: ai.py<br/>AI知识库路由与业务逻辑"]
 end
 subgraph "服务层"
-SVC_AI["服务: ai_service.py"]
-SVC_KB["服务: kb_service.py"]
+SVC_AI["服务: ai_service.py<br/>LLM客户端 + Wiki构建器"]
+SVC_KB["服务: kb_service.py<br/>知识库服务"]
 end
 subgraph "工具层"
-U_MD["工具: markdown.py"]
-U_OUT["工具: outline.py"]
+U_MD["工具: markdown.py<br/>Markdown渲染与链接解析"]
+U_OUT["工具: outline.py<br/>Editor.js内容提取"]
 end
 subgraph "模型层"
-M_AIKB["模型: ai_kb.py"]
-M_KB["模型: knowledge_base.py"]
-M_DOC["模型: document.py"]
+M_AIKB["模型: ai_kb.py<br/>AI知识库数据模型"]
+M_KB["模型: knowledge_base.py<br/>传统知识库模型"]
+M_DOC["模型: document.py<br/>文档模型"]
 end
 subgraph "配置层"
-CFG["配置: config.py"]
+CFG["配置: config.py<br/>应用配置"]
+end
+subgraph "模板层"
+TPL_AI["模板: ai/*.html<br/>AI知识库前端界面"]
 end
 BP_AI --> SVC_AI
 BP_AI --> SVC_KB
@@ -66,9 +87,10 @@ SVC_AI --> M_DOC
 SVC_KB --> M_KB
 M_AIKB --> M_DOC
 CFG --> SVC_AI
+TPL_AI --> BP_AI
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
@@ -79,7 +101,7 @@ CFG --> SVC_AI
 - [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
@@ -90,53 +112,58 @@ CFG --> SVC_AI
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 
 ## 核心组件
-- AI 知识库模型：管理知识库状态、文章、链接、源文档映射。
-- LLM 客户端：封装 OpenAI 兼容 SDK，支持自定义 base_url、api_key、model。
-- Wiki 构建器：将源文档转换为结构化 Markdown 条目，生成别名与标签，写入文件系统。
-- 链接解析器：扫描文章中的 [[Title]]，构建双向链接与反向链接。
-- 异步构建流水线：批量处理源文档、更新状态、重建链接、标记完成。
-- 问答接口：默认关键词匹配 + 文章上下文检索，可选 RAG 增强（需启用）。
-- 蓝图路由：提供创建、编辑、构建、浏览、图谱、问答等完整 API。
+- **AI知识库蓝图**：完整的Flask蓝图实现，包含创建、编辑、删除、构建、浏览、问答等所有功能
+- **AI知识库模型**：管理知识库状态、文章、链接、源文档映射的完整数据模型
+- **LLM客户端**：封装OpenAI兼容SDK，支持自定义base_url、api_key、model
+- **Wiki构建器**：将源文档转换为结构化Markdown条目，生成别名与标签，写入文件系统
+- **链接解析器**：扫描文章中的[[Title]]，构建双向链接与反向链接
+- **异步构建流水线**：批量处理源文档、更新状态、重建链接、标记完成
+- **问答接口**：默认关键词匹配 + 文章上下文检索，可选RAG增强（需启用）
+- **前端模板系统**：完整的AI知识库UI界面，包含主页、详情页、Wiki浏览、图谱、问答等
 
-章节来源
+**更新** 新增蓝图层的完整实现，包含用户认证、权限控制和完整的业务逻辑。
+
+**章节来源**
+- [app/blueprints/ai.py:18-279](file://app/blueprints/ai.py#L18-L279)
 - [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [app/services/ai_service.py:147-231](file://app/services/ai_service.py#L147-L231)
 - [app/services/ai_service.py:251-290](file://app/services/ai_service.py#L251-L290)
 - [app/services/ai_service.py:313-382](file://app/services/ai_service.py#L313-L382)
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
-- [app/blueprints/ai.py:18-279](file://app/blueprints/ai.py#L18-L279)
 
 ## 架构总览
-系统采用“蓝图-服务-模型-工具-配置”的分层架构，核心流程包括：
-- 创建 AI 知识库并添加源文档
-- 异步构建：LLM 改写 → 写入文章 → 解析链接 → 更新状态
-- 浏览与图谱：Markdown 渲染、Wiki 链接重写、反向链接展示
-- 问答：关键词打分 + 文章上下文 + LLM 回答
+系统采用"蓝图-服务-模型-工具-配置-模板"的七层架构，核心流程包括：
+- 用户认证与权限控制，确保只有知识库所有者或超级管理员可以访问
+- 创建AI知识库并添加源文档，支持从传统知识库中选择文档
+- 异步构建：LLM改写 → 写入文章 → 解析链接 → 更新状态
+- 浏览与图谱：Markdown渲染、Wiki链接重写、反向链接展示
+- 问答：关键词打分 + 文章上下文 + LLM回答
 
 ```mermaid
 sequenceDiagram
 participant U as "用户"
 participant BP as "蓝图 : ai.py"
 participant SVC as "服务 : ai_service.py"
-participant LLM as "LLM 客户端"
+participant LLM as "LLM客户端"
 participant FS as "文件系统"
 participant DB as "数据库"
-U->>BP : 触发构建请求
+U->>BP : 登录并访问AI知识库
+BP->>BP : 权限验证所有者/超级管理员
 BP->>SVC : build_wiki_async(ai_kb_id, scope)
-SVC->>DB : 设置状态为 BUILDING
+SVC->>DB : 设置状态为BUILDING
 loop 遍历待处理源文档
 SVC->>LLM : chat(改写提示词)
 LLM-->>SVC : 返回结构化文章草稿(JSON)
 SVC->>DB : upsert_article(写入文章)
-SVC->>FS : 写入 Markdown 文件
+SVC->>FS : 写入Markdown文件
 end
 SVC->>DB : resolve_links(重建链接)
-SVC->>DB : 设置状态为 READY
+SVC->>DB : 设置状态为READY
 BP-->>U : 返回构建完成
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
@@ -147,11 +174,12 @@ BP-->>U : 返回构建完成
 ## 详细组件分析
 
 ### 数据模型设计
-AI 知识库采用关系型模型，围绕“知识库-源文档-文章-链接-片段”组织数据，支持：
-- 状态机：知识库与源文档均具备状态字段，便于构建进度跟踪
-- 双向链接：文章间通过外键建立 from/to 关系，支持反向链接统计
-- 别名与标签：文章支持别名与 JSON 标签，提升链接解析准确度
-- 文件存储：文章内容以 Markdown 文件形式持久化，便于外部工具访问
+AI知识库采用关系型模型，围绕"知识库-源文档-文章-链接-片段"组织数据，支持：
+- **状态机**：知识库与源文档均具备状态字段，便于构建进度跟踪
+- **双向链接**：文章间通过外键建立from/to关系，支持反向链接统计
+- **别名与标签**：文章支持别名与JSON标签，提升链接解析准确度
+- **文件存储**：文章内容以Markdown文件形式持久化，便于外部工具访问
+- **权限控制**：通过owner_id字段实现知识库的所有权控制
 
 ```mermaid
 erDiagram
@@ -165,85 +193,88 @@ AI_KB_LINKS }o--|| AI_KB_ARTICLES : "指向"
 AI_KNOWLEDGE_BASES ||--o{ AI_KB_CHUNKS : "可选包含"
 ```
 
-图表来源
+**图表来源**
 - [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
 - [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
-章节来源
+**章节来源**
 - [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
 - [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
-### Wiki 构建流程
-- LLM 改写：使用系统提示词与用户模板，要求输出 JSON 结构，包含标题、别名、摘要、标签、正文、相关条目
-- 文章入库：去重/合并现有文章，更新别名与来源文档 ID 列表，写入数据库与 Markdown 文件
-- 文件落盘：生成 Front Matter（标题、slug、摘要、标签、时间戳），拼接正文并写入文件
-- 并发构建：后台线程逐条处理源文档，失败记录错误信息，成功后统一解析链接
+### Wiki构建流程
+- **LLM改写**：使用系统提示词与用户模板，要求输出JSON结构，包含标题、别名、摘要、标签、正文、相关条目
+- **文章入库**：去重/合并现有文章，更新别名与来源文档ID列表，写入数据库与Markdown文件
+- **文件落盘**：生成Front Matter（标题、slug、摘要、标签、时间戳），拼接正文并写入文件
+- **并发构建**：后台线程逐条处理源文档，失败记录错误信息，成功后统一解析链接
+- **状态管理**：完整的构建状态跟踪，包括PENDING、PROCESSING、PROCESSED、FAILED状态
 
 ```mermaid
 flowchart TD
 Start(["开始构建"]) --> LoadSrc["加载待处理源文档"]
 LoadSrc --> ForEach{"遍历源文档"}
-ForEach --> |是| CallLLM["调用 LLM 改写为 JSON 草稿"]
-CallLLM --> Upsert["upsert_article 写入/更新文章"]
-Upsert --> WriteFile["写入 Markdown 文件"]
+ForEach --> |是| CallLLM["调用LLM改写为JSON草稿"]
+CallLLM --> Upsert["upsert_article写入/更新文章"]
+Upsert --> WriteFile["写入Markdown文件"]
 WriteFile --> NextSrc["下一个源文档"]
 NextSrc --> ForEach
-ForEach --> |否| Resolve["resolve_links 扫描 [[...]] 并重建链接"]
-Resolve --> Done(["标记为 READY 完成"])
+ForEach --> |否| Resolve["resolve_links扫描[[...]]并重建链接"]
+Resolve --> Done(["标记为READY完成"])
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [app/services/ai_service.py:196-201](file://app/services/ai_service.py#L196-L201)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:147-231](file://app/services/ai_service.py#L147-L231)
 - [app/services/ai_service.py:251-290](file://app/services/ai_service.py#L251-L290)
 - [app/services/ai_service.py:313-382](file://app/services/ai_service.py#L313-L382)
 
 ### 链接解析机制
-- 别名索引：聚合文章标题、slug、别名，统一小写作为键，加速解析
-- 链接扫描：从文章内容中提取 [[Target]]，支持 [[Title|Anchor]] 语法
-- 双向链接：记录 from_article_id → to_article_id，支持反向链接统计与图谱渲染
-- 红链处理：未命中的链接保留为红链，便于后续修复
+- **别名索引**：聚合文章标题、slug、别名，统一小写作为键，加速解析
+- **链接扫描**：从文章内容中提取[[Target]]，支持[[Title|Anchor]]语法
+- **双向链接**：记录from_article_id → to_article_id，支持反向链接统计与图谱渲染
+- **红链处理**：未命中的链接保留为红链，便于后续修复
+- **解析器函数**：提供article_resolver函数，支持动态链接解析
 
 ```mermaid
 flowchart TD
 A["读取所有文章"] --> B["构建别名索引(title/slug/aliases)"]
-B --> C["扫描每篇文章的 [[...]] 链接"]
+B --> C["扫描每篇文章的[[...]]链接"]
 C --> D{"目标是否命中?"}
-D --> |是| E["创建 AIKBLink(from,to)"]
-D --> |否| F["创建红链(空 to_article_id)"]
+D --> |是| E["创建AIKBLink(from,to)"]
+D --> |否| F["创建红链(空to_article_id)"]
 E --> G["提交事务"]
 F --> G
 G --> H["完成"]
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:237-248](file://app/services/ai_service.py#L237-L248)
 - [app/services/ai_service.py:264-277](file://app/services/ai_service.py#L264-L277)
 - [app/utils/markdown.py:69-87](file://app/utils/markdown.py#L69-L87)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:237-290](file://app/services/ai_service.py#L237-L290)
 - [app/utils/markdown.py:42-66](file://app/utils/markdown.py#L42-L66)
 
 ### 搜索与问答机制
-- 默认问答：对问题进行分词，计算与文章标题/摘要/正文的关键词重叠得分，选取 Top-N 文章作为上下文，调用 LLM 生成答案
-- RAG 增强：通过配置开关与向量嵌入模型实现（当前仓库未实现向量存储与检索），预留扩展点
-- 图谱与导航：基于链接关系生成节点与边，支持可视化知识图谱
+- **默认问答**：对问题进行分词，计算与文章标题/摘要/正文的关键词重叠得分，选取Top-N文章作为上下文，调用LLM生成答案
+- **RAG增强**：通过配置开关与向量嵌入模型实现（当前仓库未实现向量存储与检索），预留扩展点
+- **图谱与导航**：基于链接关系生成节点与边，支持可视化知识图谱
+- **关键词重叠**：使用正则表达式提取中文和英文词汇，进行精确匹配
 
 ```mermaid
 sequenceDiagram
 participant U as "用户"
 participant BP as "蓝图 : ai.py"
 participant SVC as "服务 : ai_service.py"
-participant LLM as "LLM 客户端"
+participant LLM as "LLM客户端"
 participant DB as "数据库"
 U->>BP : POST /ai/{id}/chat
 BP->>SVC : chat_with_wiki(question)
@@ -251,73 +282,156 @@ SVC->>DB : 查询所有文章
 SVC->>SVC : 计算关键词重叠得分
 SVC->>LLM : 发送上下文+问题
 LLM-->>SVC : 返回答案
-SVC-->>BP : 返回 JSON
+SVC-->>BP : 返回JSON
 BP-->>U : 展示答案
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 - [app/blueprints/ai.py:251-261](file://app/blueprints/ai.py#L251-L261)
 
-### OpenAI API 集成与兼容性
-- 客户端封装：支持自定义 base_url、api_key、model，兼容 OpenAI、DeepSeek、Tongyi、本地代理等
-- 提示词工程：系统提示词约束输出格式与内容范围，用户模板标准化输入结构
-- 错误处理：捕获外部 LLM 调用异常，记录到源文档状态与知识库错误信息
+### OpenAI API集成与兼容性
+- **客户端封装**：支持自定义base_url、api_key、model，兼容OpenAI、DeepSeek、Tongyi、本地代理等
+- **提示词工程**：系统提示词约束输出格式与内容范围，用户模板标准化输入结构
+- **错误处理**：捕获外部LLM调用异常，记录到源文档状态与知识库错误信息
+- **模型选择**：支持每个知识库独立设置chat_model，优先级高于全局配置
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [app/services/ai_service.py:92-119](file://app/services/ai_service.py#L92-L119)
 - [app/services/ai_service.py:296-310](file://app/services/ai_service.py#L296-L310)
 - [app/config.py:37-42](file://app/config.py#L37-L42)
 
-### 向量嵌入与 RAG 实现现状
-- 当前实现：默认问答采用关键词重叠评分，不依赖向量数据库
-- 可选配置：预留 ENABLE_RAG、EMBEDDING_MODEL、CHROMA_PATH 等参数
-- 扩展建议：在 enable_rag=true 时，实现 AIKBChunk 向量化与 ChromaDB 存储，替换默认问答为向量检索 + 重排序
+### 向量嵌入与RAG实现现状
+- **当前实现**：默认问答采用关键词重叠评分，不依赖向量数据库
+- **可选配置**：预留ENABLE_RAG、EMBEDDING_MODEL、CHROMA_PATH等参数
+- **扩展建议**：在enable_rag=true时，实现AIKBChunk向量化与ChromaDB存储，替换默认问答为向量检索 + 重排序
+- **数据模型**：AIKBChunk模型已定义，支持向量化存储和查询
 
-章节来源
+**章节来源**
 - [app/config.py:44-47](file://app/config.py#L44-L47)
 - [app/models/ai_kb.py:110-121](file://app/models/ai_kb.py#L110-L121)
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 
-### API 接口文档
-- 获取状态
-  - 方法：GET
-  - 路径：/ai/{ai_kb_id}/status
-  - 返回：状态、错误信息、最后构建时间、各状态源文档数量、文章总数
-- 构建知识库
-  - 方法：POST
-  - 路径：/ai/{ai_kb_id}/build
-  - 参数：scope（all/pending）
-  - 行为：重置源文档状态（非 all 时）、异步构建
-- 浏览 Wiki
-  - 方法：GET
-  - 路径：/ai/{ai_kb_id}/wiki 或 /ai/{ai_kb_id}/wiki/{slug}
-  - 行为：渲染 Markdown，重写 [[...]] 为实际链接，展示反向链接
-- 图谱
-  - 方法：GET
-  - 路径：/ai/{ai_kb_id}/graph
-  - 行为：返回节点与边的 JSON，供前端可视化
-- 问答
-  - 方法：GET/POST
-  - 路径：/ai/{ai_kb_id}/chat
-  - 行为：POST 提交问题，返回答案；GET 加载页面
+## 前端模板系统
+AI知识库模块包含完整的前端模板系统，提供用户友好的界面：
 
-章节来源
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
-- [app/blueprints/ai.py:194-236](file://app/blueprints/ai.py#L194-L236)
-- [app/blueprints/ai.py:251-261](file://app/blueprints/ai.py#L251-L261)
-- [app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
+### 主页模板
+- **AI知识库列表**：展示用户的全部AI知识库，包含状态、描述、模型信息
+- **状态指示**：使用颜色编码显示知识库状态（ready、processing、failed、idle）
+- **快速操作**：新建按钮、查看详情链接
+
+### 详情页模板
+- **知识库概览**：名称、描述、状态、最后构建时间
+- **源文档管理**：显示已添加的源文档列表和状态
+- **Wiki条目预览**：显示前10个Wiki条目
+- **快捷操作**：构建、图谱、问答入口
+
+### Wiki浏览模板
+- **标签分组**：按标签分组显示所有Wiki条目
+- **条目列表**：网格布局显示所有条目，包含标题、摘要、更新时间
+- **导航链接**：返回上级页面的链接
+
+### Wiki文章模板
+- **文章内容**：渲染Markdown内容，支持代码高亮、表格等
+- **反向链接**：显示引用该条目的其他文章
+- **来源文档**：显示原始文档的链接
+- **重新生成**：支持重新生成单个条目
+
+**章节来源**
+- [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
+- [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
+- [app/templates/ai/wiki_home.html:1-52](file://app/templates/ai/wiki_home.html#L1-L52)
+- [app/templates/ai/wiki_article.html:1-63](file://app/templates/ai/wiki_article.html#L1-L63)
+
+## API接口文档
+
+### 知识库管理接口
+- **获取AI知识库列表**
+  - 方法：GET
+  - 路径：/ai/
+  - 功能：返回当前用户拥有的所有AI知识库
+- **创建AI知识库**
+  - 方法：POST
+  - 路径：/ai/new
+  - 参数：name、description、chat_model
+  - 功能：创建新的AI知识库
+- **编辑AI知识库**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/edit
+  - 参数：name、description、chat_model、enable_rag
+  - 功能：更新知识库配置
+- **删除AI知识库**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/delete
+  - 功能：删除指定的AI知识库
+
+### 源文档管理接口
+- **查看源文档列表**
+  - 方法：GET
+  - 路径：/ai/<ai_kb_id>/sources
+  - 功能：显示可选择的源文档列表
+- **添加源文档**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/sources/add
+  - 参数：doc_ids（数组）
+  - 功能：为AI知识库添加源文档
+- **移除源文档**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/sources/<source_id>/remove
+  - 功能：从AI知识库移除源文档
+
+### 构建与状态接口
+- **获取构建状态**
+  - 方法：GET
+  - 路径：/ai/<ai_kb_id>/status
+  - 返回：状态、错误信息、最后构建时间、各状态源文档数量、文章总数
+- **触发构建**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/build
+  - 参数：scope（all/pending）
+  - 行为：重置源文档状态（非all时）、异步构建
+
+### Wiki浏览接口
+- **Wiki首页**
+  - 方法：GET
+  - 路径：/ai/<ai_kb_id>/wiki
+  - 功能：渲染Wiki首页，按标签分组显示条目
+- **Wiki文章**
+  - 方法：GET
+  - 路径：/ai/<ai_kb_id>/wiki/<slug>
+  - 功能：渲染指定文章，重写[[...]]链接，显示反向链接
+- **重新生成文章**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/wiki/<slug>/regenerate
+  - 功能：重新生成指定文章
+
+### 图谱与问答接口
+- **知识图谱**
+  - 方法：GET
+  - 路径：/ai/<ai_kb_id>/graph
+  - 功能：返回节点与边的JSON，供前端可视化
+- **问答**
+  - 方法：GET/POST
+  - 路径：/ai/<ai_kb_id>/chat
+  - 行为：POST提交问题，返回答案；GET加载问答页面
+
+**章节来源**
+- [app/blueprints/ai.py:27-85](file://app/blueprints/ai.py#L27-L85)
+- [app/blueprints/ai.py:88-139](file://app/blueprints/ai.py#L88-L139)
+- [app/blueprints/ai.py:141-174](file://app/blueprints/ai.py#L141-L174)
+- [app/blueprints/ai.py:176-261](file://app/blueprints/ai.py#L176-L261)
+- [app/blueprints/ai.py:263-279](file://app/blueprints/ai.py#L263-L279)
 
 ## 依赖分析
-- 外部依赖：Flask、SQLAlchemy、openai、markdown、bleach、python-slugify 等
-- 可选依赖：当启用 RAG 时需要 chromadb、tiktoken
-- 配置耦合：LLM 客户端依赖 OPENAI_BASE_URL、OPENAI_API_KEY、CHAT_MODEL、AI_WIKI_DIR 等环境变量
+- **外部依赖**：Flask、SQLAlchemy、openai、markdown、bleach、python-slugify等
+- **可选依赖**：当启用RAG时需要chromadb、tiktoken
+- **配置耦合**：LLM客户端依赖OPENAI_BASE_URL、OPENAI_API_KEY、CHAT_MODEL、AI_WIKI_DIR等环境变量
+- **模板依赖**：前端模板依赖Flask Jinja2引擎和静态资源
 
 ```mermaid
 graph LR
@@ -329,61 +443,75 @@ REQ --> BLEACH["bleach"]
 REQ --> SLUG["python-slugify"]
 REQ -.-> CHROMA["chromadb(可选)"]
 REQ -.-> TIKTOKEN["tiktoken(可选)"]
+CFG["config.py"] --> SVC["ai_service.py"]
+CFG --> BP["ai.py"]
 ```
 
-图表来源
+**图表来源**
 - [requirements.txt:1-22](file://requirements.txt#L1-L22)
 
-章节来源
+**章节来源**
 - [requirements.txt:1-22](file://requirements.txt#L1-L22)
 - [app/config.py:37-47](file://app/config.py#L37-L47)
 
 ## 性能考虑
-- 并发构建：使用后台线程逐条处理源文档，避免阻塞主线程
-- I/O 优化：文章写入文件系统时批量提交数据库事务，减少磁盘写入次数
-- 链接解析：别名索引使用字典结构，O(1) 查找；链接扫描去重保持顺序
-- LLM 调用：限制单次输入长度，控制响应格式，降低 Token 成本
-- 可选 RAG：向量检索需注意索引构建与查询延迟，建议异步预热与缓存热点问题
+- **并发构建**：使用后台线程逐条处理源文档，避免阻塞主线程
+- **I/O优化**：文章写入文件系统时批量提交数据库事务，减少磁盘写入次数
+- **链接解析**：别名索引使用字典结构，O(1)查找；链接扫描去重保持顺序
+- **LLM调用**：限制单次输入长度，控制响应格式，降低Token成本
+- **可选RAG**：向量检索需注意索引构建与查询延迟，建议异步预热与缓存热点问题
+- **模板渲染**：使用Jinja2模板引擎，支持缓存和压缩
+- **静态资源**：CSS和JS文件支持浏览器缓存
 
 ## 故障排除指南
-- 构建失败
-  - 现象：知识库状态变为 FAILED，错误信息显示在状态接口
-  - 排查：检查源文档是否存在、LLM API 是否可用、网络连通性
-- 红链过多
+- **构建失败**
+  - 现象：知识库状态变为FAILED，错误信息显示在状态接口
+  - 排查：检查源文档是否存在、LLM API是否可用、网络连通性
+- **红链过多**
   - 现象：链接解析后出现大量红链
-  - 排查：确认文章标题/别名是否一致，检查 [[...]] 语法是否正确
-- 问答无结果
-  - 现象：返回“知识库为空”
+  - 排查：确认文章标题/别名是否一致，检查[[...]]语法是否正确
+- **问答无结果**
+  - 现象：返回"知识库为空"
   - 排查：确认已构建知识库且至少有一篇文章
-- 权限问题
-  - 现象：访问 403
+- **权限问题**
+  - 现象：访问403
   - 排查：确认当前用户为知识库所有者或超级管理员
+- **模板渲染错误**
+  - 现象：页面显示异常或空白
+  - 排查：检查模板文件是否存在、Jinja2语法是否正确
+- **LLM调用失败**
+  - 现象：构建过程中出现API错误
+  - 排查：检查OPENAI_BASE_URL、OPENAI_API_KEY配置、网络连接
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/services/ai_service.py:256-257](file://app/services/ai_service.py#L256-L257)
 - [app/services/ai_service.py:394-395](file://app/services/ai_service.py#L394-L395)
 - [app/blueprints/ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
 
 ## 结论
-该 AI 知识库模块以 Karpathy LLM Wiki 为核心思想，结合 LLM 自动化改写与双向链接构建知识图谱，提供开箱即用的问答能力。默认实现无需向量数据库即可获得良好效果，同时为 RAG 增强预留了清晰的扩展路径。通过蓝图-服务-模型-工具的分层设计，系统具备良好的可维护性与可扩展性。
+该AI知识库模块以Karpathy LLM Wiki为核心思想，结合LLM自动化改写与双向链接构建知识图谱，提供开箱即用的问答能力。系统采用完整的蓝图-服务-模型-工具-模板分层设计，包含用户认证、权限控制、异步构建、完整的前端界面等企业级功能。默认实现无需向量数据库即可获得良好效果，同时为RAG增强预留了清晰的扩展路径。通过模块化设计，系统具备良好的可维护性与可扩展性。
 
 ## 附录
 
 ### 与传统知识库的区别与优势
-- 结构化输出：通过 LLM 将非结构化文档转换为带标签、别名、摘要的结构化条目
-- 双向链接：自动解析内部引用，形成知识图谱，提升检索与发现效率
-- 低门槛：无需复杂向量库部署，即可实现语义检索与问答
-- 可扩展：在需要时接入向量嵌入与 ChromaDB，实现更精准的语义搜索
+- **结构化输出**：通过LLM将非结构化文档转换为带标签、别名、摘要的结构化条目
+- **双向链接**：自动解析内部引用，形成知识图谱，提升检索与发现效率
+- **低门槛**：无需复杂向量库部署，即可实现语义检索与问答
+- **可扩展**：在需要时接入向量嵌入与ChromaDB，实现更精准的语义搜索
+- **完整生态**：包含前端模板、用户界面、权限控制等完整功能
 
 ### 开发者扩展方法
-- 新增提示词模板：在服务层增加系统/用户提示词，适配不同领域
-- 自定义解析规则：在链接解析与 Markdown 渲染处扩展别名与锚点规则
-- 集成向量检索：实现 AIKBChunk 的向量化与 ChromaDB 存储，替换默认问答为向量检索
-- 增强安全：在 Markdown 渲染与 LLM 输入处增加内容过滤与长度限制
+- **新增提示词模板**：在服务层增加系统/用户提示词，适配不同领域
+- **自定义解析规则**：在链接解析与Markdown渲染处扩展别名与锚点规则
+- **集成向量检索**：实现AIKBChunk的向量化与ChromaDB存储，替换默认问答为向量检索
+- **增强安全**：在Markdown渲染与LLM输入处增加内容过滤与长度限制
+- **扩展前端**：基于现有模板系统开发新的UI组件和交互功能
 
 ### 调试技巧
-- 使用状态接口轮询构建进度
-- 在日志中记录 LLM 请求与响应摘要
-- 对链接解析失败的条目进行人工修正并回滚重建
-- 逐步缩小问题范围：先验证 LLM 可用性，再检查数据库与文件系统
+- **使用状态接口轮询构建进度**
+- **在日志中记录LLM请求与响应摘要**
+- **对链接解析失败的条目进行人工修正并回滚重建**
+- **逐步缩小问题范围：先验证LLM可用性，再检查数据库与文件系统**
+- **使用浏览器开发者工具检查AJAX请求和响应**
+- **验证模板渲染是否正常，检查Jinja2语法错误**

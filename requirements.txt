@@ -1,0 +1,21 @@
+Flask==3.0.3
+Flask-SQLAlchemy==3.1.1
+Flask-Migrate==4.0.7
+Flask-Login==0.6.3
+Flask-WTF==1.2.1
+WTForms==3.1.2
+PyMySQL==1.1.1
+cryptography==42.0.8
+SQLAlchemy==2.0.32
+python-dotenv==1.0.1
+Pillow==10.4.0
+bleach==6.1.0
+markdown==3.7
+python-slugify==8.0.4
+Werkzeug==3.0.3
+email-validator==2.2.0
+requests==2.32.3
+openai==1.40.0
+# Optional, only needed when ENABLE_RAG=true
+# chromadb==0.5.5
+# tiktoken==0.7.0

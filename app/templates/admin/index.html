@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}超管控制台 · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+  <header class="flex items-center justify-between">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">超管控制台</h1>
+      <p class="text-slate-500 text-sm mt-1">系统级管理入口</p>
+    </div>
+    <span class="text-xs px-2 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-200">SUPER_ADMIN</span>
+  </header>
+
+  <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="bg-white border border-slate-200 rounded-xl p-5"><div class="text-slate-500 text-sm">用户</div><div class="text-3xl font-bold mt-2 text-indigo-600">{{ stats.users or 0 }}</div></div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5"><div class="text-slate-500 text-sm">知识库</div><div class="text-3xl font-bold mt-2 text-emerald-600">{{ stats.kbs or 0 }}</div></div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5"><div class="text-slate-500 text-sm">公开知识库</div><div class="text-3xl font-bold mt-2 text-sky-600">{{ stats.public_kbs or 0 }}</div></div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5"><div class="text-slate-500 text-sm">文档</div><div class="text-3xl font-bold mt-2 text-violet-600">{{ stats.docs or 0 }}</div></div>
+  </section>
+
+  <section class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+    {% for label, href, desc, color in [
+      ('用户管理', url_for('admin.users'), '禁用 / 启用 / 重置密码 / 分配角色', 'indigo'),
+      ('角色权限', url_for('admin.roles'), '维护角色及其权限项', 'emerald'),
+      ('管理员', url_for('admin.admins'), '提升 / 撤销系统管理员', 'rose'),
+      ('公开知识库', url_for('admin.public_kbs'), '审核与下架公开知识库', 'sky'),
+      ('公开文档', url_for('admin.public_docs'), '巡查公开文档', 'amber'),
+    ] %}
+      <a href="{{ href }}" class="block bg-white border border-slate-200 hover:border-{{ color }}-300 hover:shadow rounded-xl p-5 transition">
+        <div class="font-semibold text-slate-800">{{ label }}</div>
+        <p class="text-sm text-slate-500 mt-1">{{ desc }}</p>
+      </a>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

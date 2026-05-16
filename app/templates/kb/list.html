@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}知识库 · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-slate-800">知识库</h1>
+    <a href="{{ url_for('kb.new_kb') }}" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-500">+ 新建知识库</a>
+  </div>
+  <div class="border-b border-slate-200 mb-6 flex gap-4 text-sm">
+    <a href="{{ url_for('kb.list_kbs', tab='mine') }}"
+       class="px-1 py-2 -mb-px border-b-2 {{ 'border-indigo-600 text-indigo-600' if tab=='mine' else 'border-transparent text-slate-500 hover:text-slate-800' }}">我的知识库</a>
+    <a href="{{ url_for('kb.list_kbs', tab='public') }}"
+       class="px-1 py-2 -mb-px border-b-2 {{ 'border-indigo-600 text-indigo-600' if tab=='public' else 'border-transparent text-slate-500 hover:text-slate-800' }}">公开广场</a>
+  </div>
+  {% if kbs %}
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {% for kb in kbs %}
+        <a href="{{ url_for('kb.detail', kb_id=kb.id) }}" class="block bg-white border border-slate-200 rounded-xl p-5 hover:shadow-md hover:border-indigo-300 transition">
+          <div class="flex items-center justify-between">
+            <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold">{{ kb.name[:1] }}</div>
+            <span class="text-xs px-2 py-0.5 rounded-full
+              {% if kb.visibility == 'private' %}bg-slate-100 text-slate-600
+              {% elif kb.visibility == 'members' %}bg-amber-100 text-amber-700
+              {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+              {% if kb.visibility == 'private' %}私密{% elif kb.visibility == 'members' %}成员{% else %}公开{% endif %}
+            </span>
+          </div>
+          <h3 class="mt-3 font-semibold text-slate-800 truncate">{{ kb.name }}</h3>
+          <p class="text-sm text-slate-500 mt-1 line-clamp-2">{{ kb.description or '暂无描述' }}</p>
+          <p class="text-xs text-slate-400 mt-3">{{ kb.created_at.strftime('%Y-%m-%d') }} 创建</p>
+        </a>
+      {% endfor %}
+    </div>
+  {% else %}
+    <div class="text-center py-16 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+      暂无知识库
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

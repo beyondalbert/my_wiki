@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}500 服务异常{% endblock %}
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-24 text-center">
+  <div class="text-7xl font-bold text-amber-500">500</div>
+  <p class="mt-3 text-slate-700 text-lg">服务暂时出错，请稍后重试</p>
+  <a href="{{ url_for('main.index') }}" class="inline-block mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">返回首页</a>
+</div>
+{% endblock %}

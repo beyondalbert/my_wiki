@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ ai_kb.name }} · AI 知识库{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">{{ ai_kb.name }}</h1>
+      <p class="text-slate-500 text-sm mt-1">{{ ai_kb.description or '暂无描述' }}</p>
+    </div>
+    <div class="flex gap-2">
+      <a href="{{ url_for('ai.sources', ai_kb_id=ai_kb.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">管理源文档</a>
+      <a href="{{ url_for('ai.wiki_home', ai_kb_id=ai_kb.id) }}" class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-500">浏览 Wiki</a>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="flex items-center justify-between">
+          <h2 class="font-semibold text-slate-800">构建状态：<span class="text-violet-600">{{ ai_kb.status }}</span></h2>
+          <form method="post" action="{{ url_for('ai.build', ai_kb_id=ai_kb.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <button class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-500">触发构建 / 重生</button>
+          </form>
+        </div>
+        <p class="text-sm text-slate-500 mt-2">最近构建：{{ ai_kb.last_built_at.strftime('%Y-%m-%d %H:%M') if ai_kb.last_built_at else '—' }}</p>
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">源文档（{{ sources|length }}）</h2>
+        {% if sources %}
+          <ul class="text-sm divide-y divide-slate-100">
+            {% for s in sources %}
+              <li class="py-2 flex items-center justify-between">
+                <span class="text-slate-700 truncate">{{ s.document.title if s.document else '已删除文档' }}</span>
+                <span class="text-xs text-slate-400">{{ s.status }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-slate-400 text-sm">尚未加入源文档，去 <a class="text-violet-600 hover:underline" href="{{ url_for('ai.sources', ai_kb_id=ai_kb.id) }}">添加</a></p>
+        {% endif %}
+      </div>
+
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">Wiki 条目（{{ articles|length }}）</h2>
+        {% if articles %}
+          <ul class="text-sm divide-y divide-slate-100">
+            {% for a in articles[:10] %}
+              <li class="py-2 flex items-center justify-between">
+                <a class="text-violet-600 hover:underline" href="{{ url_for('ai.wiki_article', ai_kb_id=ai_kb.id, slug=a.slug) }}">{{ a.title }}</a>
+                <span class="text-xs text-slate-400">{{ a.updated_at.strftime('%m-%d %H:%M') }}</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-slate-400 text-sm">还未生成 Wiki 条目</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <aside class="space-y-4">
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="text-sm text-slate-500">模型</div>
+        <div class="font-medium text-slate-800 mt-1">{{ ai_kb.chat_model or '默认' }}</div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="text-sm text-slate-500">RAG 增强</div>
+        <div class="font-medium text-slate-800 mt-1">{{ '已启用' if ai_kb.enable_rag else '未启用（纯 Wiki 模式）' }}</div>
+      </div>
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <div class="text-sm text-slate-500">红链（未解析的双链）</div>
+        <div class="font-bold text-rose-500 text-2xl mt-1">{{ redlinks|length if redlinks else 0 }}</div>
+      </div>
+      <a href="{{ url_for('ai.graph', ai_kb_id=ai_kb.id) }}" class="block text-center px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm">关系图</a>
+      <a href="{{ url_for('ai.chat', ai_kb_id=ai_kb.id) }}" class="block text-center px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 text-sm">与 Wiki 对话</a>
+    </aside>
+  </div>
+</div>
+{% endblock %}

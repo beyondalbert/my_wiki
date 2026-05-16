@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Wiki · {{ ai_kb.name }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">{{ ai_kb.name }} · Wiki</h1>
+      <p class="text-slate-500 text-sm mt-1">共 {{ articles|length }} 条目</p>
+    </div>
+    <a href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}" class="text-sm text-slate-500 hover:text-violet-600">← 返回</a>
+  </div>
+
+  {% if tag_groups %}
+    <section class="mb-8">
+      <h2 class="font-semibold text-slate-800 mb-3">按标签</h2>
+      <div class="flex flex-wrap gap-2">
+        {% for tag, items in tag_groups.items() %}
+          <details class="group bg-white border border-slate-200 rounded-lg">
+            <summary class="cursor-pointer px-3 py-1.5 text-sm font-medium text-violet-700">#{{ tag }} <span class="text-slate-400">({{ items|length }})</span></summary>
+            <ul class="px-3 pb-3 text-sm space-y-1">
+              {% for a in items %}
+                <li><a class="text-slate-700 hover:text-violet-600" href="{{ url_for('ai.wiki_article', ai_kb_id=ai_kb.id, slug=a.slug) }}">{{ a.title }}</a></li>
+              {% endfor %}
+            </ul>
+          </details>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
+
+  <section>
+    <h2 class="font-semibold text-slate-800 mb-3">所有条目</h2>
+    {% if articles %}
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {% for a in articles %}
+          <a href="{{ url_for('ai.wiki_article', ai_kb_id=ai_kb.id, slug=a.slug) }}"
+             class="block bg-white border border-slate-200 rounded-lg p-3 hover:border-violet-300 hover:shadow-sm">
+            <div class="font-medium text-slate-800 truncate">{{ a.title }}</div>
+            <div class="text-xs text-slate-500 line-clamp-2 mt-1">{{ a.summary or '—' }}</div>
+            <div class="text-xs text-slate-400 mt-2">{{ a.updated_at.strftime('%Y-%m-%d') }}</div>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-16 text-slate-500 bg-slate-50 rounded-xl border border-dashed">
+        还没有 Wiki 条目，请到 <a class="text-violet-600 hover:underline" href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}">详情页</a> 触发构建
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

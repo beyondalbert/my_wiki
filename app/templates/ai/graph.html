@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}关系图 · {{ ai_kb.name }}{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-slate-800">关系图：{{ ai_kb.name }}</h1>
+    <a href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}" class="text-sm text-slate-500 hover:text-violet-600">← 返回</a>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-4">
+    <p class="text-sm text-slate-500 mb-3">基于条目间的双链关系（共 {{ nodes|length }} 节点 / {{ edges|length }} 边）。完整可视化（D3 / Cytoscape）后续接入。</p>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {% for n in nodes %}
+        <div class="border border-slate-200 rounded-lg p-3">
+          <a class="font-medium text-violet-600 hover:underline" href="{{ url_for('ai.wiki_article', ai_kb_id=ai_kb.id, slug=n.slug) }}">{{ n.title }}</a>
+          <div class="text-xs text-slate-500 mt-1">出链 {{ n.out_count }} · 入链 {{ n.in_count }}</div>
+        </div>
+      {% else %}
+        <div class="text-slate-400 text-sm">暂无数据</div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}{{ kb.name }} · {{ site_name }}{% endblock %}
+
+{% macro render_node(node, level=0) %}
+  <li>
+    <a href="{{ url_for('doc.view', doc_id=node.id) }}"
+       class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate"
+       style="padding-left: {{ 0.5 + level * 0.75 }}rem">
+      <span class="text-slate-400 text-xs">{{ '📄' if node.type=='doc' else '📊' }}</span>
+      <span class="truncate">{{ node.title }}</span>
+      {% if node.privacy == 'private' %}<span class="ml-auto text-xs text-slate-400">🔒</span>{% endif %}
+    </a>
+    {% if node.children %}
+      <ul>
+        {% for child in node.children %}{{ render_node(child, level+1) }}{% endfor %}
+      </ul>
+    {% endif %}
+  </li>
+{% endmacro %}
+
+{% block content %}
+<div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="grid grid-cols-12 gap-6">
+    {# Left: doc tree #}
+    <aside class="col-span-3 lg:col-span-2">
+      <div class="bg-white border border-slate-200 rounded-xl">
+        <div class="p-3 border-b border-slate-100 flex items-center justify-between">
+          <div class="font-semibold text-slate-800 truncate">{{ kb.name }}</div>
+          {% if can_manage %}
+            <a href="{{ url_for('kb.edit_kb', kb_id=kb.id) }}" class="text-xs text-slate-400 hover:text-indigo-600">设置</a>
+          {% endif %}
+        </div>
+        <div class="p-2 max-h-[70vh] overflow-y-auto">
+          {% if tree %}
+            <ul>{% for node in tree %}{{ render_node(node) }}{% endfor %}</ul>
+          {% else %}
+            <p class="text-xs text-slate-400 px-2 py-4 text-center">暂无文档</p>
+          {% endif %}
+        </div>
+        {% if can_edit %}
+        <div class="p-2 border-t border-slate-100">
+          <form method="post" action="{{ url_for('doc.new_doc') }}" class="flex gap-2">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="kb_id" value="{{ kb.id }}" />
+            <input name="title" placeholder="新文档标题" class="flex-1 px-2 py-1 text-sm border border-slate-200 rounded" />
+            <select name="type" class="px-2 py-1 text-sm border border-slate-200 rounded">
+              <option value="doc">文档</option>
+              <option value="sheet">表格</option>
+            </select>
+            <button class="px-2 py-1 text-sm bg-indigo-600 text-white rounded">+</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% if can_manage %}
+        <a href="{{ url_for('kb.members', kb_id=kb.id) }}" class="block mt-3 text-center text-sm text-slate-600 hover:text-indigo-600">成员管理 →</a>
+      {% endif %}
+    </aside>
+
+    {# Middle: welcome / first doc summary #}
+    <main class="col-span-9 lg:col-span-7">
+      <div class="bg-white border border-slate-200 rounded-xl p-8">
+        <h1 class="text-3xl font-bold text-slate-800">{{ kb.name }}</h1>
+        <p class="mt-2 text-slate-500">{{ kb.description or '这个知识库还没有描述' }}</p>
+        <div class="mt-4 flex flex-wrap gap-2 text-xs">
+          <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">{{ kb.created_at.strftime('%Y-%m-%d') }} 创建</span>
+          <span class="px-2 py-0.5 rounded-full
+            {% if kb.visibility == 'private' %}bg-slate-100 text-slate-600
+            {% elif kb.visibility == 'members' %}bg-amber-100 text-amber-700
+            {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+            {% if kb.visibility == 'private' %}私密{% elif kb.visibility == 'members' %}成员{% else %}公开{% endif %}
+          </span>
+        </div>
+        {% if first_doc %}
+          <a href="{{ url_for('doc.view', doc_id=first_doc.id) }}" class="inline-block mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">
+            打开第一篇：{{ first_doc.title }}
+          </a>
+        {% else %}
+          <div class="mt-6 text-slate-500">还没有文档，从左侧创建一篇试试吧。</div>
+        {% endif %}
+      </div>
+    </main>
+
+    {# Right: outline placeholder #}
+    <aside class="hidden lg:block lg:col-span-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 sticky top-20">
+        <div class="font-semibold text-slate-800 mb-2">大纲</div>
+        <p class="text-sm text-slate-400">打开文档后这里会显示标题大纲。</p>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}

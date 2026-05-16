@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }} · {{ site_name }}{% endblock %}
+
+{% macro render_node(node, current_id, level=0) %}
+  <li>
+    <a href="{{ url_for('doc.view', doc_id=node.id) }}"
+       class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate {% if node.id == current_id %}active{% endif %}"
+       style="padding-left: {{ 0.5 + level * 0.75 }}rem">
+      <span class="text-slate-400 text-xs">{{ '📄' if node.type=='doc' else '📊' }}</span>
+      <span class="truncate">{{ node.title }}</span>
+    </a>
+    {% if node.children %}<ul>{% for c in node.children %}{{ render_node(c, current_id, level+1) }}{% endfor %}</ul>{% endif %}
+  </li>
+{% endmacro %}
+
+{% block content %}
+<div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="grid grid-cols-12 gap-6">
+    <aside class="col-span-3 lg:col-span-2">
+      <div class="bg-white border border-slate-200 rounded-xl">
+        <div class="p-3 border-b border-slate-100">
+          <a href="{{ url_for('kb.detail', kb_id=kb.id) }}" class="font-semibold text-slate-800 truncate hover:text-indigo-600">{{ kb.name }}</a>
+        </div>
+        <div class="p-2 max-h-[70vh] overflow-y-auto">
+          <ul>{% for n in tree %}{{ render_node(n, doc.id) }}{% endfor %}</ul>
+        </div>
+      </div>
+    </aside>
+
+    <main class="col-span-9 lg:col-span-7">
+      <div class="bg-white border border-slate-200 rounded-xl p-8">
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
+          <div class="flex gap-2 shrink-0">
+            {% if can_edit %}
+              <a href="{{ url_for('doc.edit', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">编辑</a>
+              {% if doc.can_be_shared %}
+                <a href="{{ url_for('doc.share', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">分享</a>
+              {% endif %}
+            {% endif %}
+          </div>
+        </div>
+        <div class="text-xs text-slate-400 mb-6">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}
+          {% if doc.privacy == 'private' %}· <span class="text-rose-500">🔒 私密</span>{% endif %}
+        </div>
+        <div id="doc-content" class="prose prose-slate max-w-none">
+          {# Rendered by Editor.js JSON via JS for now: dump JSON for simple paragraphs #}
+          <div id="doc-json" class="text-slate-700 whitespace-pre-wrap text-sm"></div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="hidden lg:block lg:col-span-3">
+      <div class="bg-white border border-slate-200 rounded-xl p-4 sticky top-20 outline">
+        <div class="font-semibold text-slate-800 mb-2">大纲</div>
+        {% if outline %}
+          {% for it in outline %}
+            <a href="#{{ it.anchor }}" class="lvl-{{ it.level }}">{{ it.text }}</a>
+          {% endfor %}
+        {% else %}
+          <p class="text-sm text-slate-400">该文档暂无大纲</p>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+  // Minimal renderer: render Editor.js blocks to HTML for read-only view
+  (function () {
+    const raw = {{ doc.content_json|tojson if doc.content_json else 'null' }};
+    const target = document.getElementById('doc-content');
+    if (!raw) { target.innerHTML = '<p class="text-slate-400">暂无内容</p>'; return; }
+    let data;
+    try { data = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { target.textContent = raw; return; }
+    const blocks = data.blocks || [];
+    const html = blocks.map(b => {
+      const d = b.data || {};
+      switch (b.type) {
+        case 'header': {
+          const lv = Math.min(Math.max(d.level || 2, 1), 6);
+          const txt = d.text || '';
+          const anchor = (txt.replace(/\s+/g,'-').toLowerCase()).replace(/[^\w\u4e00-\u9fa5\-]/g,'');
+          return `<h${lv} id="${anchor}">${txt}</h${lv}>`;
+        }
+        case 'paragraph': return `<p>${d.text || ''}</p>`;
+        case 'list': {
+          const tag = d.style === 'ordered' ? 'ol' : 'ul';
+          const items = (d.items||[]).map(i => `<li>${i}</li>`).join('');
+          return `<${tag}>${items}</${tag}>`;
+        }
+        case 'checklist': {
+          return `<ul>${(d.items||[]).map(i => `<li>${i.checked?'☑':'☐'} ${i.text||''}</li>`).join('')}</ul>`;
+        }
+        case 'quote': return `<blockquote>${d.text||''}</blockquote>`;
+        case 'code':  return `<pre><code>${(d.code||'').replace(/</g,'&lt;')}</code></pre>`;
+        case 'delimiter': return '<hr/>';
+        case 'table': {
+          const rows = d.content || [];
+          return '<table class="border-collapse w-full text-sm">'+
+            rows.map((r,i)=>{
+              const tag = (i===0 && d.withHeadings) ? 'th' : 'td';
+              return '<tr>'+r.map(c=>`<${tag} class="border border-slate-200 px-2 py-1">${c}</${tag}>`).join('')+'</tr>';
+            }).join('')+'</table>';
+        }
+        default: return '';
+      }
+    }).join('');
+    target.innerHTML = html || '<p class="text-slate-400">暂无内容</p>';
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}公开文档巡查 · 超管{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-slate-800">公开文档</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回控制台</a>
+  </div>
+  <form method="get" class="mb-4 flex gap-2">
+    <input name="q" value="{{ q }}" placeholder="按标题搜索"
+           class="flex-1 max-w-md px-3 py-2 border border-slate-300 rounded-lg" />
+    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg">搜索</button>
+  </form>
+  <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-left">
+        <tr><th class="px-4 py-2">标题</th><th class="px-4 py-2">所属知识库</th><th class="px-4 py-2">作者</th><th class="px-4 py-2">更新时间</th><th class="px-4 py-2"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for d in pager.items %}
+          <tr>
+            <td class="px-4 py-2"><a class="text-indigo-600 hover:underline" href="{{ url_for('doc.view', doc_id=d.id) }}">{{ d.title }}</a></td>
+            <td class="px-4 py-2 text-slate-500">{{ d.kb.name if d.kb else '—' }}</td>
+            <td class="px-4 py-2 text-slate-500">{{ d.author.username if d.author else '—' }}</td>
+            <td class="px-4 py-2 text-slate-400">{{ d.updated_at.strftime('%Y-%m-%d') }}</td>
+            <td class="px-4 py-2 text-right">
+              <form method="post" action="{{ url_for('admin.takedown_doc', doc_id=d.id) }}" class="inline"
+                    onsubmit="return confirm('下架该文档？')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="text-rose-600 hover:underline">下架</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">暂无公开文档</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pager.pages > 1 %}
+    <div class="mt-4 flex justify-center gap-1 text-sm">
+      {% for p in range(1, pager.pages + 1) %}
+        <a href="?page={{ p }}&q={{ q }}"
+           class="px-3 py-1 rounded {% if p == pager.page %}bg-indigo-600 text-white{% else %}bg-white border border-slate-200{% endif %}">{{ p }}</a>
+      {% endfor %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

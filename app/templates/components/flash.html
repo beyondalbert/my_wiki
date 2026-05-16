@@ -1,0 +1,20 @@
+{# Flash messages #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-4 space-y-2"
+         x-data="{shown:true}" x-show="shown">
+      {% for category, msg in messages %}
+        {% set color = {
+          'success': 'bg-emerald-50 text-emerald-700 border-emerald-200',
+          'error':   'bg-rose-50 text-rose-700 border-rose-200',
+          'warning': 'bg-amber-50 text-amber-700 border-amber-200',
+          'info':    'bg-sky-50 text-sky-700 border-sky-200',
+        }.get(category, 'bg-slate-50 text-slate-700 border-slate-200') %}
+        <div class="flex items-start gap-2 px-4 py-2.5 border rounded-lg text-sm {{ color }}">
+          <span class="flex-1">{{ msg }}</span>
+          <button class="opacity-60 hover:opacity-100" @click="shown=false">×</button>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endwith %}

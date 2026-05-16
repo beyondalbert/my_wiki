@@ -1,0 +1,35 @@
+/* App-level styles. Local Tailwind brings utilities; here are global tweaks. */
+
+[x-cloak] { display: none !important; }
+
+html, body { font-family: 'Inter', system-ui, -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; }
+
+/* line-clamp helpers when not on Tailwind v3 JIT */
+.line-clamp-1, .line-clamp-2, .line-clamp-3 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.line-clamp-1 { -webkit-line-clamp: 1; }
+.line-clamp-2 { -webkit-line-clamp: 2; }
+.line-clamp-3 { -webkit-line-clamp: 3; }
+
+/* Wiki redlink */
+.wiki-redlink {
+  color: #e11d48;
+  text-decoration: underline dotted;
+  cursor: help;
+}
+
+/* Editor.js minimal padding tweaks */
+.ce-block__content, .ce-toolbar__content { max-width: 100%; }
+
+/* Document tree */
+.doc-tree-item.active { background-color: #eef2ff; color: #4338ca; }
+.doc-tree-item:hover { background-color: #f1f5f9; }
+
+/* Outline anchors */
+.outline a { display: block; padding: 0.25rem 0.5rem; border-radius: 0.375rem; color: #475569; }
+.outline a:hover { background-color: #f1f5f9; color: #4338ca; }
+.outline a.lvl-2 { padding-left: 1rem; }
+.outline a.lvl-3 { padding-left: 1.75rem; font-size: 0.85em; }

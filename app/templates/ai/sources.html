@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}选择源文档 · {{ ai_kb.name }}{% endblock %}
+{% block content %}
+<div class="max-w-5xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">选择源文档</h1>
+      <p class="text-slate-500 text-sm mt-1">{{ ai_kb.name }} · 选择文档加入到 AI 知识库进行 Wiki 化</p>
+    </div>
+    <a href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}" class="text-sm text-slate-500 hover:text-violet-600">← 返回</a>
+  </div>
+
+  <form method="post" action="{{ url_for('ai.add_sources', ai_kb_id=ai_kb.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+      {% for kb_name, docs in (kb_docs or {}).items() %}
+        <div class="p-4">
+          <div class="font-semibold text-slate-800 mb-2">{{ kb_name }}</div>
+          <ul class="space-y-1">
+            {% for d in docs %}
+              <li class="flex items-center gap-2 text-sm">
+                <input type="checkbox" name="doc_ids" value="{{ d.id }}"
+                       {{ 'disabled checked' if d.id in (existing_doc_ids or []) }}
+                       class="rounded text-violet-600" />
+                <span class="text-slate-700">{{ d.title }}</span>
+                {% if d.id in (existing_doc_ids or []) %}<span class="text-xs text-emerald-600 ml-auto">已加入</span>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% else %}
+        <div class="p-8 text-center text-slate-400">没有可加入的文档</div>
+      {% endfor %}
+    </div>
+    <div class="mt-4 flex justify-end">
+      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500">加入选中文档</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

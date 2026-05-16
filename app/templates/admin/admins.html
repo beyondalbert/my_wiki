@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}管理员管理 · 超管{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-slate-800">管理员管理</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回控制台</a>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-slate-50 text-slate-500 text-left">
+        <tr><th class="px-4 py-2">ID</th><th class="px-4 py-2">用户名</th><th class="px-4 py-2">邮箱</th><th class="px-4 py-2">状态</th><th class="px-4 py-2"></th></tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for u in admins %}
+          <tr>
+            <td class="px-4 py-2 text-slate-400">{{ u.id }}</td>
+            <td class="px-4 py-2 font-medium">{{ u.username }}</td>
+            <td class="px-4 py-2 text-slate-500">{{ u.email }}</td>
+            <td class="px-4 py-2"><span class="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700">超级管理员</span></td>
+            <td class="px-4 py-2 text-right">
+              <form method="post" action="{{ url_for('admin.demote_admin', user_id=u.id) }}" class="inline"
+                    onsubmit="return confirm('撤销 {{ u.username }} 的超管身份？')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="text-rose-600 hover:underline">撤销</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="5" class="px-4 py-10 text-center text-slate-400">暂无超级管理员</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

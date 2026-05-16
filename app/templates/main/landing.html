@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}{{ site_name }} · 个人 Wiki + AI 笔记{% endblock %}
+
+{% block content %}
+<section class="relative overflow-hidden">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-20 lg:pt-24 lg:pb-28">
+    <div class="grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="inline-flex items-center gap-2 text-xs font-medium px-2.5 py-1 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100">
+          受 Karpathy LLM Wiki 启发 · 纯 Markdown 双链
+        </span>
+        <h1 class="mt-4 text-4xl lg:text-5xl font-bold tracking-tight text-slate-900">
+          构建你的<span class="text-indigo-600">第二大脑</span><br/>
+          一个可与 AI 共生的个人 Wiki
+        </h1>
+        <p class="mt-5 text-lg text-slate-600 leading-relaxed">
+          支持私密 / 成员 / 公开三种知识库；文档与表格统一管理；通过 LLM 把你的笔记自动重写为统一模板的双链 Wiki，零向量库依赖，可选 RAG 增强。
+        </p>
+        <div class="mt-8 flex flex-wrap items-center gap-3">
+          <a href="{{ url_for('auth.register') }}" class="px-5 py-2.5 rounded-lg bg-indigo-600 text-white font-medium hover:bg-indigo-500 shadow-sm">免费注册</a>
+          <a href="{{ url_for('auth.login') }}" class="px-5 py-2.5 rounded-lg border border-slate-300 hover:bg-slate-50 font-medium">立即登录</a>
+        </div>
+        <dl class="mt-10 grid grid-cols-3 gap-4 text-sm">
+          <div><dt class="text-slate-500">文档形态</dt><dd class="font-semibold text-slate-800 mt-1">块编辑器 + 表格</dd></div>
+          <div><dt class="text-slate-500">权限模型</dt><dd class="font-semibold text-slate-800 mt-1">RBAC + 可见性</dd></div>
+          <div><dt class="text-slate-500">AI 方法论</dt><dd class="font-semibold text-slate-800 mt-1">双向超链接 Wiki</dd></div>
+        </dl>
+      </div>
+      <div class="relative">
+        <div class="absolute -inset-6 bg-gradient-to-tr from-indigo-100 via-white to-violet-100 rounded-3xl blur-2xl opacity-70"></div>
+        <div class="relative bg-white border border-slate-200 rounded-2xl shadow-xl p-6">
+          <div class="flex items-center gap-2 text-xs text-slate-500 mb-4">
+            <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+            <span class="ml-2">/ai/wiki/transformer.md</span>
+          </div>
+          <h2 class="font-bold text-slate-800">Transformer</h2>
+          <p class="text-sm text-slate-500 mt-1"><strong>Tags</strong> #deep-learning #attention</p>
+          <p class="text-sm text-slate-700 mt-3 leading-relaxed">
+            Transformer 是一种基于<a class="text-indigo-600 underline">[[Attention]]</a>机制的序列模型，由
+            <a class="text-indigo-600 underline">[[Vaswani 2017]]</a>提出，相较于<a class="text-rose-500 underline decoration-dotted">[[RNN]]</a>具备更强的并行能力……
+          </p>
+          <div class="mt-4 pt-4 border-t border-slate-100 text-xs text-slate-500">
+            Backlinks · <a class="text-indigo-600">[[Self-Attention]]</a> · <a class="text-indigo-600">[[BERT]]</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-white border-y border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div class="flex items-end justify-between mb-8">
+      <h2 class="text-2xl font-bold text-slate-800">公开知识库</h2>
+      <a href="{{ url_for('kb.list_kbs', tab='public') if current_user.is_authenticated else url_for('auth.login') }}"
+         class="text-sm text-indigo-600 hover:underline">查看更多 →</a>
+    </div>
+    {% if public_kbs %}
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        {% for kb in public_kbs %}
+          <a href="{{ url_for('kb.detail', kb_id=kb.id) }}"
+             class="group block rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-md p-5 bg-white transition">
+            <div class="w-10 h-10 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold mb-3">
+              {{ kb.name[:1] }}
+            </div>
+            <h3 class="font-semibold text-slate-800 group-hover:text-indigo-600 truncate">{{ kb.name }}</h3>
+            <p class="text-sm text-slate-500 mt-1 line-clamp-2">{{ kb.description or '暂无描述' }}</p>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        暂无公开知识库
+      </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

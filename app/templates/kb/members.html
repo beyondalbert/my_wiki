@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}成员管理 · {{ kb.name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">成员管理</h1>
+      <p class="text-slate-500 text-sm">{{ kb.name }}</p>
+    </div>
+    <a href="{{ url_for('kb.detail', kb_id=kb.id) }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回知识库</a>
+  </div>
+
+  <form method="post" class="bg-white border border-slate-200 rounded-xl p-4 flex flex-wrap items-end gap-3">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <div class="flex-1 min-w-[200px]">
+      <label class="block text-xs text-slate-500 mb-1">用户名 / 邮箱</label>
+      <input name="user" required class="w-full px-3 py-2 border border-slate-300 rounded-lg" />
+    </div>
+    <div>
+      <label class="block text-xs text-slate-500 mb-1">角色</label>
+      <select name="role" class="px-3 py-2 border border-slate-300 rounded-lg">
+        <option value="viewer">仅查看</option>
+        <option value="editor">可编辑</option>
+      </select>
+    </div>
+    <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">添加成员</button>
+  </form>
+
+  <div class="mt-6 bg-white border border-slate-200 rounded-xl">
+    <table class="w-full text-sm">
+      <thead class="text-left text-slate-500">
+        <tr>
+          <th class="px-4 py-2">用户</th>
+          <th class="px-4 py-2">角色</th>
+          <th class="px-4 py-2">加入时间</th>
+          <th class="px-4 py-2"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-slate-100">
+        {% for m in members %}
+          <tr>
+            <td class="px-4 py-2">{{ m.user.username if m.user else '—' }}</td>
+            <td class="px-4 py-2">{{ '编辑' if m.role=='editor' else '查看' }}</td>
+            <td class="px-4 py-2 text-slate-400">{{ m.created_at.strftime('%Y-%m-%d') }}</td>
+            <td class="px-4 py-2 text-right">
+              <form method="post" action="{{ url_for('kb.remove_member', kb_id=kb.id, user_id=m.user_id) }}"
+                    onsubmit="return confirm('移除该成员？')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button class="text-rose-600 hover:underline">移除</button>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="4" class="px-4 py-8 text-center text-slate-400">还没有成员</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

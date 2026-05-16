@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}角色与权限 · 超管{% endblock %}
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold text-slate-800">角色与权限</h1>
+    <a href="{{ url_for('admin.index') }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回控制台</a>
+  </div>
+  <div class="grid lg:grid-cols-2 gap-6">
+    <div class="bg-white border border-slate-200 rounded-xl p-5">
+      <h2 class="font-semibold text-slate-800 mb-3">角色</h2>
+      <ul class="divide-y divide-slate-100">
+        {% for r in roles %}
+          <li class="py-3">
+            <div class="flex items-center justify-between">
+              <div>
+                <div class="font-medium text-slate-800">{{ r.name }} <span class="text-xs text-slate-400">({{ r.code }})</span></div>
+                <div class="text-xs text-slate-500 mt-1">{{ r.description or '—' }}</div>
+              </div>
+            </div>
+            <div class="mt-2 flex flex-wrap gap-1">
+              {% for p in r.permissions %}
+                <span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded">{{ p.code }}</span>
+              {% else %}
+                <span class="text-xs text-slate-400">未分配权限</span>
+              {% endfor %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5">
+      <h2 class="font-semibold text-slate-800 mb-3">权限项</h2>
+      <ul class="text-sm divide-y divide-slate-100">
+        {% for p in perms %}
+          <li class="py-2 flex items-center justify-between">
+            <span><code class="text-indigo-700">{{ p.code }}</code> · {{ p.name }}</span>
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

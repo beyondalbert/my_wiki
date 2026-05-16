@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}个人中心 · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+  <div class="bg-white border border-slate-200 rounded-2xl p-8">
+    <div class="flex items-center gap-4">
+      <div class="w-16 h-16 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center text-2xl font-bold shadow">
+        {{ user.username[:1]|upper }}
+      </div>
+      <div>
+        <h1 class="text-xl font-semibold text-slate-800">{{ user.username }}</h1>
+        <p class="text-sm text-slate-500">{{ user.email }}</p>
+        {% if user.is_super_admin %}
+          <span class="inline-block mt-1 text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-600 border border-rose-200">超级管理员</span>
+        {% endif %}
+      </div>
+    </div>
+    <dl class="mt-6 grid sm:grid-cols-2 gap-4 text-sm">
+      <div class="bg-slate-50 rounded-lg p-4">
+        <dt class="text-slate-500">注册时间</dt>
+        <dd class="text-slate-800 font-medium mt-1">{{ user.created_at.strftime('%Y-%m-%d %H:%M') }}</dd>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-4">
+        <dt class="text-slate-500">上次登录</dt>
+        <dd class="text-slate-800 font-medium mt-1">{{ (user.last_login_at and user.last_login_at.strftime('%Y-%m-%d %H:%M')) or '—' }}</dd>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-4">
+        <dt class="text-slate-500">账号状态</dt>
+        <dd class="text-slate-800 font-medium mt-1">{{ '已启用' if user.is_active else '已禁用' }}</dd>
+      </div>
+      <div class="bg-slate-50 rounded-lg p-4">
+        <dt class="text-slate-500">角色</dt>
+        <dd class="text-slate-800 font-medium mt-1">
+          {% for r in user.roles %}<span class="inline-block mr-1 px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 text-xs">{{ r.name }}</span>{% else %}—{% endfor %}
+        </dd>
+      </div>
+    </dl>
+  </div>
+</div>
+{% endblock %}

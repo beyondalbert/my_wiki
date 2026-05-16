@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}工作台 · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+  <header>
+    <h1 class="text-2xl font-bold text-slate-800">你好，{{ current_user.username }}</h1>
+    <p class="text-slate-500 mt-1">这里是你的知识库工作台</p>
+  </header>
+
+  <section class="grid sm:grid-cols-3 gap-4">
+    <div class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="text-slate-500 text-sm">我的知识库</div>
+      <div class="mt-2 text-3xl font-bold text-indigo-600">{{ counts.kbs }}</div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="text-slate-500 text-sm">我的文档</div>
+      <div class="mt-2 text-3xl font-bold text-emerald-600">{{ counts.docs }}</div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl p-5">
+      <div class="text-slate-500 text-sm">AI 知识库</div>
+      <div class="mt-2 text-3xl font-bold text-violet-600">{{ counts.ai_kbs }}</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="flex items-end justify-between mb-3">
+      <h2 class="text-lg font-semibold text-slate-800">我的知识库</h2>
+      <div class="flex gap-2">
+        <a href="{{ url_for('kb.new_kb') }}" class="px-3 py-1.5 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-500">+ 新建知识库</a>
+        <a href="{{ url_for('kb.list_kbs') }}" class="text-sm text-indigo-600 px-3 py-1.5 hover:underline">查看全部</a>
+      </div>
+    </div>
+    {% if my_kbs %}
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for kb in my_kbs %}
+          <a href="{{ url_for('kb.detail', kb_id=kb.id) }}" class="block bg-white border border-slate-200 rounded-xl p-4 hover:shadow-md hover:border-indigo-300 transition">
+            <div class="flex items-center gap-2">
+              <div class="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-sm">{{ kb.name[:1] }}</div>
+              <span class="text-xs px-2 py-0.5 rounded-full
+                {% if kb.visibility == 'private' %}bg-slate-100 text-slate-600
+                {% elif kb.visibility == 'members' %}bg-amber-100 text-amber-700
+                {% else %}bg-emerald-100 text-emerald-700{% endif %}">
+                {% if kb.visibility == 'private' %}私密{% elif kb.visibility == 'members' %}成员{% else %}公开{% endif %}
+              </span>
+            </div>
+            <h3 class="font-semibold text-slate-800 mt-3 truncate">{{ kb.name }}</h3>
+            <p class="text-sm text-slate-500 line-clamp-2 mt-1">{{ kb.description or '暂无描述' }}</p>
+          </a>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="text-center py-12 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+        还没有知识库，<a href="{{ url_for('kb.new_kb') }}" class="text-indigo-600 hover:underline">创建第一个</a>
+      </div>
+    {% endif %}
+  </section>
+
+  <section class="grid lg:grid-cols-2 gap-6">
+    <div>
+      <h2 class="text-lg font-semibold text-slate-800 mb-3">最近编辑</h2>
+      {% if recent_docs %}
+        <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {% for d in recent_docs %}
+            <li class="px-4 py-3 hover:bg-slate-50">
+              <a href="{{ url_for('doc.view', doc_id=d.id) }}" class="flex items-center justify-between gap-3">
+                <span class="truncate text-slate-800">{{ d.title }}</span>
+                <span class="text-xs text-slate-400">{{ d.updated_at.strftime('%Y-%m-%d %H:%M') }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-center py-8 text-slate-500 bg-slate-50 rounded-xl border border-dashed">暂无文档</div>
+      {% endif %}
+    </div>
+    <div>
+      <h2 class="text-lg font-semibold text-slate-800 mb-3">AI 知识库</h2>
+      {% if ai_kbs %}
+        <ul class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
+          {% for ai in ai_kbs %}
+            <li class="px-4 py-3 hover:bg-slate-50">
+              <a href="{{ url_for('ai.detail', ai_kb_id=ai.id) }}" class="flex items-center justify-between gap-3">
+                <span class="truncate text-slate-800">{{ ai.name }}</span>
+                <span class="text-xs text-slate-400">{{ ai.status }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-center py-8 text-slate-500 bg-slate-50 rounded-xl border border-dashed">
+          <a href="{{ url_for('ai.index') }}" class="text-indigo-600 hover:underline">创建一个 AI 知识库</a>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+</div>
+{% endblock %}

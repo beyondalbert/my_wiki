@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}{{ doc.title }} · 分享{% endblock %}
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <div class="flex items-center justify-between text-xs text-slate-400 mb-3">
+    <span>📄 公开分享 · 只读视图</span>
+    <span>访问 {{ share.view_count }} 次{% if share.expires_at %} · 到期 {{ share.expires_at.strftime('%Y-%m-%d %H:%M') }}{% endif %}</span>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-8">
+    <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
+    <div class="text-xs text-slate-400 mt-2 mb-6">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}</div>
+    <div id="doc-content" class="prose prose-slate max-w-none"></div>
+  </div>
+</div>
+{% endblock %}
+{% block body_extra %}
+<script>
+(function () {
+  const raw = {{ doc.content_json|tojson if doc.content_json else 'null' }};
+  const target = document.getElementById('doc-content');
+  if (!raw) { target.innerHTML = '<p class="text-slate-400">暂无内容</p>'; return; }
+  let data;
+  try { data = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch(e){ target.textContent = raw; return; }
+  const blocks = data.blocks || [];
+  target.innerHTML = blocks.map(b => {
+    const d = b.data || {};
+    switch (b.type) {
+      case 'header': { const lv=Math.min(Math.max(d.level||2,1),6); return `<h${lv}>${d.text||''}</h${lv}>`; }
+      case 'paragraph': return `<p>${d.text||''}</p>`;
+      case 'list': { const t = d.style==='ordered'?'ol':'ul'; return `<${t}>${(d.items||[]).map(i=>`<li>${i}</li>`).join('')}</${t}>`; }
+      case 'quote': return `<blockquote>${d.text||''}</blockquote>`;
+      case 'code': return `<pre><code>${(d.code||'').replace(/</g,'&lt;')}</code></pre>`;
+      case 'delimiter': return '<hr/>';
+      case 'table': {
+        const rows = d.content||[];
+        return '<table class="border-collapse w-full text-sm">'+rows.map((r,i)=>{
+          const tag=(i===0 && d.withHeadings)?'th':'td';
+          return '<tr>'+r.map(c=>`<${tag} class="border border-slate-200 px-2 py-1">${c}</${tag}>`).join('')+'</tr>';
+        }).join('')+'</table>';
+      }
+      default: return '';
+    }
+  }).join('');
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}编辑 · {{ doc.title }}{% endblock %}
+{% block content %}
+<div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+  <div class="flex items-center gap-3 mb-4">
+    <a href="{{ url_for('doc.view', doc_id=doc.id) }}" class="text-sm text-slate-500 hover:text-indigo-600">← 退出编辑</a>
+    <span class="text-slate-300">|</span>
+    <span class="text-sm text-slate-500">所属：<a class="hover:text-indigo-600" href="{{ url_for('kb.detail', kb_id=kb.id) }}">{{ kb.name }}</a></span>
+    <span id="save-status" class="ml-auto text-xs text-slate-400">未变更</span>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-6">
+    <input id="doc-title" value="{{ doc.title }}" placeholder="标题"
+           class="w-full text-3xl font-bold text-slate-800 outline-none border-0 focus:ring-0 mb-4" />
+    <div class="flex items-center gap-3 mb-4 text-sm">
+      <label class="inline-flex items-center gap-1">
+        <span class="text-slate-500">类型：</span>
+        <select id="doc-privacy" class="px-2 py-1 border border-slate-200 rounded">
+          <option value="normal" {{ 'selected' if doc.privacy=='normal' }}>常规</option>
+          <option value="private" {{ 'selected' if doc.privacy=='private' }}>私密</option>
+        </select>
+      </label>
+      <button id="btn-save" class="ml-auto px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">保存 (Ctrl+S)</button>
+    </div>
+    <div id="editorjs" class="border border-slate-100 rounded-lg p-4 min-h-[400px]"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block head_extra %}
+<script src="{{ url_for('static', filename='vendor/js/editorjs/editor.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/header.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/list.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/checklist.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/quote.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/code.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/inline-code.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/table.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/marker.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/editorjs/delimiter.min.js') }}"></script>
+{% endblock %}
+
+{% block body_extra %}
+<script>
+(function () {
+  const SAVE_URL = "{{ url_for('doc.save', doc_id=doc.id) }}";
+  const status = document.getElementById('save-status');
+  let initialData = null;
+  try { initialData = {{ doc.content_json|tojson if doc.content_json else 'null' }}; if (typeof initialData==='string') initialData=JSON.parse(initialData); } catch(e){ initialData = null; }
+
+  const editor = new EditorJS({
+    holder: 'editorjs',
+    placeholder: '在此开始书写……',
+    data: initialData || { blocks: [] },
+    tools: {
+      header: { class: Header, inlineToolbar: ['marker','inlineCode'] },
+      list:   { class: List,   inlineToolbar: true },
+      checklist: { class: Checklist, inlineToolbar: true },
+      quote:  { class: Quote, inlineToolbar: true },
+      code:   { class: CodeTool },
+      inlineCode: { class: InlineCode },
+      table:  { class: Table, inlineToolbar: true, config: { rows: 2, cols: 2 } },
+      marker: { class: Marker },
+      delimiter: { class: Delimiter },
+    },
+    onChange: () => { status.textContent = '已修改'; status.className='ml-auto text-xs text-amber-500'; }
+  });
+
+  async function save() {
+    status.textContent = '保存中…';
+    const out = await editor.save();
+    const r = await fetch(SAVE_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: document.getElementById('doc-title').value || '未命名',
+        content_json: JSON.stringify(out),
+        privacy: document.getElementById('doc-privacy').value,
+      }),
+    });
+    if (r.ok) {
+      status.textContent = '已保存 · ' + new Date().toLocaleTimeString();
+      status.className = 'ml-auto text-xs text-emerald-600';
+    } else {
+      status.textContent = '保存失败';
+      status.className = 'ml-auto text-xs text-rose-600';
+    }
+  }
+  document.getElementById('btn-save').addEventListener('click', save);
+  document.addEventListener('keydown', e => {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); save(); }
+  });
+})();
+</script>
+{% endblock %}

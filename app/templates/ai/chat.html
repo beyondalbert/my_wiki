@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}与 Wiki 对话 · {{ ai_kb.name }}{% endblock %}
+{% block content %}
+<div class="max-w-3xl mx-auto px-4 py-8" x-data="chatApp()">
+  <div class="flex items-center justify-between mb-4">
+    <h1 class="text-2xl font-bold text-slate-800">与 Wiki 对话</h1>
+    <a href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}" class="text-sm text-slate-500 hover:text-violet-600">← 返回</a>
+  </div>
+  <div class="bg-white border border-slate-200 rounded-xl p-5 min-h-[400px] mb-4">
+    <template x-for="(m, i) in messages" :key="i">
+      <div class="mb-4">
+        <div class="text-xs text-slate-400 mb-1" x-text="m.role === 'user' ? '我' : 'AI'"></div>
+        <div class="prose prose-slate max-w-none whitespace-pre-wrap" x-text="m.content"></div>
+      </div>
+    </template>
+    <div x-show="loading" class="text-sm text-slate-400">AI 思考中…</div>
+  </div>
+  <form @submit.prevent="ask" class="flex gap-2">
+    <input x-model="q" required placeholder="例如：请总结这个 Wiki 中关于 X 的核心观点"
+           class="flex-1 px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-violet-500 outline-none" />
+    <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500" :disabled="loading">提问</button>
+  </form>
+</div>
+{% endblock %}
+{% block body_extra %}
+<script>
+function chatApp() {
+  return {
+    q: '',
+    loading: false,
+    messages: [],
+    async ask() {
+      const text = this.q.trim();
+      if (!text) return;
+      this.messages.push({role:'user', content:text});
+      this.q = '';
+      this.loading = true;
+      try {
+        const r = await fetch("{{ url_for('ai.chat_send', ai_kb_id=ai_kb.id) }}", {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({question: text}),
+        });
+        const data = await r.json();
+        this.messages.push({role:'ai', content: data.answer || '（无回复）'});
+      } catch(e) {
+        this.messages.push({role:'ai', content: '请求失败：' + e.message});
+      } finally {
+        this.loading = false;
+      }
+    }
+  };
+}
+</script>
+{% endblock %}

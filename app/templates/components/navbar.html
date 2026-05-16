@@ -1,0 +1,45 @@
+{# Top navigation bar #}
+<header class="bg-white/80 backdrop-blur sticky top-0 z-30 border-b border-slate-200">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 group">
+      <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm">麦</span>
+      <span class="font-semibold text-slate-800 group-hover:text-indigo-600">{{ site_name }}</span>
+    </a>
+    <nav class="hidden md:flex items-center gap-1 text-sm">
+      {% if current_user.is_authenticated %}
+        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('user.dashboard') }}">工作台</a>
+        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('kb.list_kbs') }}">知识库</a>
+        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('ai.index') }}">AI 知识库</a>
+        {% if current_user.is_super_admin %}
+          <a class="px-3 py-1.5 rounded-md text-rose-600 hover:bg-rose-50" href="{{ url_for('admin.index') }}">超管</a>
+        {% endif %}
+      {% else %}
+        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('kb.list_kbs', tab='public') if false else url_for('main.index') }}">首页</a>
+      {% endif %}
+    </nav>
+    <div class="flex items-center gap-2">
+      {% if current_user.is_authenticated %}
+        <div x-data="{open:false}" class="relative">
+          <button @click="open=!open" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-100">
+            <span class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white flex items-center justify-center text-sm font-semibold">
+              {{ current_user.username[:1]|upper }}
+            </span>
+            <span class="hidden sm:inline text-sm">{{ current_user.username }}</span>
+          </button>
+          <div x-show="open" @click.outside="open=false" x-transition x-cloak
+               class="absolute right-0 mt-2 w-44 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm">
+            <a class="block px-3 py-2 hover:bg-slate-50" href="{{ url_for('user.profile') }}">个人中心</a>
+            <a class="block px-3 py-2 hover:bg-slate-50" href="{{ url_for('user.dashboard') }}">我的工作台</a>
+            <form method="post" action="{{ url_for('auth.logout') }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <button class="w-full text-left px-3 py-2 hover:bg-rose-50 text-rose-600" type="submit">退出登录</button>
+            </form>
+          </div>
+        </div>
+      {% else %}
+        <a href="{{ url_for('auth.login') }}" class="px-3 py-1.5 text-sm rounded-md text-slate-600 hover:bg-slate-100">登录</a>
+        <a href="{{ url_for('auth.register') }}" class="px-3 py-1.5 text-sm rounded-md bg-indigo-600 text-white hover:bg-indigo-500">注册</a>
+      {% endif %}
+    </div>
+  </div>
+</header>

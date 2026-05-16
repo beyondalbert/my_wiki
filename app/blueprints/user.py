@@ -1,10 +1,10 @@
 """User blueprint: dashboard / profile."""
-from flask import Blueprint, render_template
-from flask_login import login_required, current_user
+from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask_login import login_required, current_user, logout_user
 
 from ..extensions import db
 from ..models import Document, KnowledgeBase, AIKnowledgeBase
-from ..services import kb_service
+from ..services import auth_service, kb_service
 
 bp = Blueprint("user", __name__)
 
@@ -32,3 +32,19 @@ def dashboard():
 @login_required
 def profile():
     return render_template("user/profile.html", user=current_user)
+
+
+@bp.route("/profile/change-password", methods=["POST"])
+@login_required
+def change_password():
+    old_password = request.form.get("old_password") or ""
+    new_password = request.form.get("new_password") or ""
+    new_password2 = request.form.get("new_password2") or ""
+    try:
+        auth_service.change_password(current_user, old_password, new_password, new_password2)
+    except auth_service.AuthError as e:
+        flash(str(e), "error")
+        return redirect(url_for("user.profile"))
+    logout_user()
+    flash("密码修改成功，请使用新密码重新登录", "success")
+    return redirect(url_for("auth.login"))

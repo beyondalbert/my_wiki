@@ -54,3 +54,16 @@ def mark_login(user: User) -> None:
     user.last_login_at = datetime.utcnow()
     user.last_login_ip = (request.headers.get("X-Forwarded-For") or request.remote_addr or "")[:64]
     db.session.commit()
+
+
+def change_password(user: User, old_password: str, new_password: str, new_password2: str) -> None:
+    if not user.check_password(old_password or ""):
+        raise AuthError("原密码不正确")
+    if not new_password or len(new_password) < 6:
+        raise AuthError("新密码长度至少 6 位")
+    if new_password != new_password2:
+        raise AuthError("两次新密码不一致")
+    if new_password == old_password:
+        raise AuthError("新密码不能与原密码相同")
+    user.set_password(new_password)
+    db.session.commit()

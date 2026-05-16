@@ -15,17 +15,21 @@
       <textarea name="description" rows="3" maxlength="500"
                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">{{ form.description or '' }}</textarea>
     </div>
-    <div>
+    <div x-data="{ visibility: '{{ form.visibility or 'private' }}' }">
       <label class="block text-sm font-medium text-slate-700 mb-2">可见性</label>
       <div class="grid sm:grid-cols-3 gap-3">
-        {% for v, label, desc, color in [
-          ('private','私密','仅自己可见','slate'),
-          ('members','成员','已邀请的成员可见','amber'),
-          ('public','公开','所有人都能浏览','emerald'),
+        {% for v, label, desc, border_color, bg_color in [
+          ('private','私密','仅自己可见','#6366f1','#eef2ff'),
+          ('members','成员','已邀请的成员可见','#f59e0b','#fffbeb'),
+          ('public','公开','所有人都能浏览','#10b981','#ecfdf5'),
         ] %}
-          <label class="cursor-pointer">
-            <input type="radio" name="visibility" value="{{ v }}" class="peer sr-only" {{ 'checked' if (form.visibility or 'private') == v }} />
-            <div class="border-2 border-slate-200 peer-checked:border-{{ color }}-500 peer-checked:bg-{{ color }}-50 rounded-lg p-3">
+          <label class="cursor-pointer block" @click="visibility='{{ v }}'">
+            <input type="radio" name="visibility" value="{{ v }}" class="sr-only"
+                   :checked="visibility === '{{ v }}'" />
+            <div class="rounded-lg p-3 transition"
+                 :style="visibility === '{{ v }}'
+                   ? 'border:2px solid {{ border_color }}; background-color:{{ bg_color }};'
+                   : 'border:2px solid #e2e8f0; background-color:#ffffff;'">
               <div class="font-medium text-slate-800">{{ label }}</div>
               <div class="text-xs text-slate-500 mt-1">{{ desc }}</div>
             </div>

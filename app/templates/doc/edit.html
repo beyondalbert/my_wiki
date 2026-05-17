@@ -24,6 +24,15 @@
           <option value="private" {{ 'selected' if doc.privacy=='private' }}>私密</option>
         </select>
       </label>
+      <label class="inline-flex items-center gap-1">
+        <span class="text-slate-500">分组：</span>
+        <select id="doc-group" class="px-2 py-1 border border-slate-200 rounded">
+          <option value="" {{ 'selected' if not doc.group_id }}>未分组</option>
+          {% for g in groups %}
+            <option value="{{ g.id }}" {{ 'selected' if doc.group_id == g.id }}>{{ g.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
       <button id="btn-save" class="ml-auto px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">保存 (Ctrl+S)</button>
     </div>
     {% if is_sheet %}
@@ -164,6 +173,7 @@
           title: document.getElementById('doc-title').value || '未命名',
           content_json: getPayload(),
           privacy: document.getElementById('doc-privacy').value,
+          group_id: document.getElementById('doc-group').value || '',
         }),
       });
       if (r.ok) {

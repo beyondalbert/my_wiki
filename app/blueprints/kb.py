@@ -4,7 +4,7 @@ from flask_login import login_required, current_user
 
 from ..extensions import db
 from ..models import (
-    KnowledgeBase, KBMember, KBVisibility, KBMemberRole, User, Document
+    KnowledgeBase, KBMember, KBVisibility, KBMemberRole, User, Document, DocGroup
 )
 from ..services import kb_service, doc_service
 
@@ -168,3 +168,74 @@ def remove_member(kb_id, user_id):
     kb_service.remove_member(kb, user_id)
     flash("已移除成员", "info")
     return redirect(url_for("kb.members", kb_id=kb.id))
+
+
+# ---------- Doc Groups ----------
+
+@bp.route("/<kb_id>/groups/new", methods=["POST"])
+@login_required
+def new_group(kb_id):
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    name = (request.form.get("name") or "").strip() or "未命名分组"
+    max_order = db.session.query(db.func.coalesce(db.func.max(DocGroup.sort_order), 0)).filter_by(kb_id=kb.id).scalar()
+    group = DocGroup(kb_id=kb.id, name=name, sort_order=max_order + 1)
+    db.session.add(group)
+    db.session.commit()
+    flash(f"分组「{name}」已创建", "success")
+    return redirect(url_for("kb.detail", kb_id=kb.id))
+
+
+@bp.route("/<kb_id>/groups/<group_id>/rename", methods=["POST"])
+@login_required
+def rename_group(kb_id, group_id):
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    group = DocGroup.query.filter_by(id=group_id, kb_id=kb.id).first_or_404()
+    name = (request.form.get("name") or "").strip()
+    if name:
+        group.name = name
+        db.session.commit()
+        flash("分组已重命名", "success")
+    return redirect(url_for("kb.detail", kb_id=kb.id))
+
+
+@bp.route("/<kb_id>/groups/<group_id>/delete", methods=["POST"])
+@login_required
+def delete_group(kb_id, group_id):
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    group = DocGroup.query.filter_by(id=group_id, kb_id=kb.id).first_or_404()
+    # 分组内文档移回“未分组”
+    Document.query.filter_by(group_id=group.id, is_deleted=False).update({"group_id": None})
+    db.session.delete(group)
+    db.session.commit()
+    flash("分组已删除，文档已移至未分组", "info")
+    return redirect(url_for("kb.detail", kb_id=kb.id))
+
+
+@bp.route("/<kb_id>/docs/<doc_id>/move-group", methods=["POST"])
+@login_required
+def move_doc_to_group(kb_id, doc_id):
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    doc = Document.query.filter_by(id=doc_id, kb_id=kb.id, is_deleted=False).first_or_404()
+    # 支持 JSON 和 Form 两种提交方式
+    if request.is_json:
+        data = request.get_json(silent=True) or {}
+        target_group_id = (data.get("group_id") or "").strip() or None
+    else:
+        target_group_id = (request.form.get("group_id") or "").strip() or None
+    if target_group_id:
+        grp = DocGroup.query.filter_by(id=target_group_id, kb_id=kb.id).first()
+        if not grp:
+            abort(404)
+    doc.group_id = target_group_id
+    db.session.commit()
+    if request.is_json:
+        return jsonify({"ok": True, "group_id": target_group_id})
+    return redirect(request.referrer or url_for("kb.detail", kb_id=kb.id))

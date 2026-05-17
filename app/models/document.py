@@ -1,4 +1,4 @@
-"""Document and DocumentShare models."""
+"""Document, DocGroup and DocumentShare models."""
 from datetime import datetime
 from enum import Enum
 
@@ -6,6 +6,22 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 from ..extensions import db
 from ..utils.ids import generate_id
+
+
+class DocGroup(db.Model):
+    """A group/folder within a knowledge base for organizing documents."""
+    __tablename__ = "doc_groups"
+
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    kb_id = db.Column(db.String(12), db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = db.Column(db.String(128), nullable=False, default="未命名分组")
+    sort_order = db.Column(db.Integer, default=0, nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    kb = db.relationship("KnowledgeBase", backref=db.backref("groups", lazy="dynamic"))
+
+    def __repr__(self) -> str:
+        return f"<DocGroup {self.id} {self.name}>"
 
 
 class DocumentType(str, Enum):
@@ -23,6 +39,7 @@ class Document(db.Model):
 
     id = db.Column(db.String(12), primary_key=True, default=generate_id)
     kb_id = db.Column(db.String(12), db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id = db.Column(db.String(12), db.ForeignKey("doc_groups.id", ondelete="SET NULL"), index=True)
     parent_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="SET NULL"), index=True)
 
     title = db.Column(db.String(255), nullable=False, default="未命名")
@@ -43,6 +60,7 @@ class Document(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
     kb = db.relationship("KnowledgeBase", backref=db.backref("documents", lazy="dynamic"))
+    group = db.relationship("DocGroup", backref=db.backref("documents", lazy="dynamic"))
     author = db.relationship("User", backref=db.backref("authored_docs", lazy="dynamic"))
     parent = db.relationship("Document", remote_side=[id], backref=db.backref("children", lazy="dynamic"))
 

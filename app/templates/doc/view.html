@@ -5,6 +5,7 @@
 {% macro render_node(node, current_id, level=0) %}
   <li>
     <a href="{{ url_for('doc.view', doc_id=node.id) }}"
+       draggable="true" data-doc-id="{{ node.id }}"
        class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate {% if node.id == current_id %}active{% endif %}"
        style="padding-left: {{ 0.5 + level * 0.75 }}rem">
       <span class="text-slate-400 text-xs">{{ '📄' if node.type=='doc' else '📊' }}</span>
@@ -53,12 +54,37 @@
           {% endif %}
         </div>
         {% endif %}
-        <div class="px-3 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
+        <div class="px-3 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-wide">
           <span>文档列表</span>
-          {% if tree %}<span class="text-slate-300">{{ tree|length }}</span>{% endif %}
         </div>
         <div class="p-2 max-h-[60vh] overflow-y-auto">
-          <ul>{% for n in tree %}{{ render_node(n, doc.id) }}{% endfor %}</ul>
+          {% if tree %}
+            {% for section in tree %}
+              {% if section.group %}
+                <div class="mt-2 first:mt-0 drop-zone" data-group-id="{{ section.group.id }}" x-data="{ expanded: true }">
+                  <button @click="expanded = !expanded" class="flex items-center gap-1 px-2 py-1 w-full text-left">
+                    <span class="text-xs text-slate-400" x-text="expanded ? '▼' : '▶'"></span>
+                    <span class="text-xs font-medium text-slate-500 truncate">📁 {{ section.group.name }}</span>
+                  </button>
+                  <ul x-show="expanded" class="ml-3 border-l border-slate-200 pl-1">
+                    {% for n in section.docs %}{{ render_node(n, doc.id, 1) }}{% endfor %}
+                    {% if not section.docs %}
+                      <li class="text-xs text-slate-300 px-4 py-1">（空）</li>
+                    {% endif %}
+                  </ul>
+                </div>
+              {% else %}
+                <div class="drop-zone" data-group-id="">
+                  {% if section.docs %}
+                  <div class="px-2 pt-1 pb-0.5 text-xs text-slate-400 uppercase tracking-wide">未分组</div>
+                  <ul>{% for n in section.docs %}{{ render_node(n, doc.id) }}{% endfor %}</ul>
+                  {% else %}
+                  <div class="px-2 pt-1 pb-0.5 text-xs text-slate-300">（拖拽文档到此取消分组）</div>
+                  {% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
+          {% endif %}
         </div>
       </div>
     </aside>
@@ -208,4 +234,51 @@
   }
 })();
 </script>
+{% if can_edit %}
+<script>
+(function () {
+  var KB_ID = '{{ kb.id }}';
+
+  document.querySelectorAll('[data-doc-id][draggable]').forEach(function (el) {
+    el.addEventListener('dragstart', function (e) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', el.getAttribute('data-doc-id'));
+      el.style.opacity = '0.5';
+    });
+    el.addEventListener('dragend', function () {
+      el.style.opacity = '';
+      document.querySelectorAll('.drop-zone').forEach(function (z) {
+        z.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+      });
+    });
+  });
+
+  document.querySelectorAll('.drop-zone').forEach(function (zone) {
+    zone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      zone.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+    });
+    zone.addEventListener('dragleave', function () {
+      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+    });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+      var docId = e.dataTransfer.getData('text/plain');
+      if (!docId) return;
+      var groupId = zone.getAttribute('data-group-id') || '';
+      fetch('/kb/' + KB_ID + '/docs/' + docId + '/move-group', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_id: groupId })
+      }).then(function (r) {
+        if (r.ok) { location.reload(); }
+        else { alert('移动失败'); }
+      }).catch(function () { alert('网络错误'); });
+    });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

@@ -7,7 +7,7 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from ..extensions import csrf, db
-from ..models import Document, KnowledgeBase, DocumentPrivacy, DocumentType, DocumentShare
+from ..models import Document, DocGroup, KnowledgeBase, DocumentPrivacy, DocumentType, DocumentShare
 from ..services import kb_service, doc_service, share_service
 from ..utils.ids import generate_id
 from ..utils.outline import extract_outline
@@ -66,6 +66,7 @@ def new_doc():
     if not kb_service.can_edit(current_user, kb):
         abort(403)
     parent_id = (request.form.get("parent_id") or "").strip() or None
+    group_id = (request.form.get("group_id") or "").strip() or None
     doc_type = request.form.get("type") or DocumentType.DOC.value
     if doc_type not in {t.value for t in DocumentType}:
         doc_type = DocumentType.DOC.value
@@ -74,7 +75,7 @@ def new_doc():
         privacy = DocumentPrivacy.NORMAL.value
     title = (request.form.get("title") or "未命名").strip()
     doc = doc_service.create_document(kb, current_user, title=title, parent_id=parent_id,
-                                      doc_type=doc_type, privacy=privacy)
+                                      doc_type=doc_type, privacy=privacy, group_id=group_id)
     return redirect(url_for("doc.edit", doc_id=doc.id))
 
 
@@ -103,7 +104,8 @@ def edit(doc_id):
     if not kb_service.can_edit(current_user, kb):
         abort(403)
     tree = doc_service.list_kb_doc_tree(kb.id)
-    return render_template("doc/edit.html", doc=doc, kb=kb, tree=tree)
+    groups = DocGroup.query.filter_by(kb_id=kb.id).order_by(DocGroup.sort_order.asc(), DocGroup.created_at.asc()).all()
+    return render_template("doc/edit.html", doc=doc, kb=kb, tree=tree, groups=groups)
 
 
 @bp.route("/<doc_id>/save", methods=["POST"])
@@ -119,6 +121,15 @@ def save(doc_id):
     privacy = payload.get("privacy")
     if privacy in {p.value for p in DocumentPrivacy}:
         doc.privacy = privacy
+    # 分组设置
+    if "group_id" in payload:
+        gid = (payload["group_id"] or "").strip() or None
+        if gid:
+            grp = DocGroup.query.filter_by(id=gid, kb_id=kb.id).first()
+            if grp:
+                doc.group_id = gid
+        else:
+            doc.group_id = None
     doc_service.update_content(doc, content_json or "", title=title)
     outline = extract_outline(doc.content_json)
     return jsonify({"ok": True, "outline": outline, "updated_at": doc.updated_at.isoformat()})

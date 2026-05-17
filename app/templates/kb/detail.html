@@ -4,7 +4,8 @@
 {% macro render_node(node, level=0) %}
   <li>
     <a href="{{ url_for('doc.view', doc_id=node.id) }}"
-       class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate"
+       draggable="true" data-doc-id="{{ node.id }}"
+       class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate hover:bg-slate-50"
        style="padding-left: {{ 0.5 + level * 0.75 }}rem">
       <span class="text-slate-400 text-xs">{{ '📄' if node.type=='doc' else '📊' }}</span>
       <span class="truncate">{{ node.title }}</span>
@@ -30,7 +31,7 @@
             <a href="{{ url_for('kb.edit_kb', kb_id=kb.id) }}" class="text-xs text-slate-400 hover:text-indigo-600">设置</a>
           {% endif %}
         </div>
-        {# 操作区：始终可见，不被文档树滚动区吞掉 #}
+        {# 操作区 #}
         {% if can_edit or can_manage %}
         <div class="p-2 border-b border-slate-100 space-y-2">
           {% if can_edit %}
@@ -52,6 +53,19 @@
               <span>📊</span><span>新建表格</span>
             </button>
           </form>
+          {# 新建分组 #}
+          <div x-data="{ open: false }">
+            <button @click="open = !open" type="button"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border border-slate-200 rounded">
+              <span>📁</span><span>新建分组</span>
+            </button>
+            <form x-show="open" x-cloak method="post" action="{{ url_for('kb.new_group', kb_id=kb.id) }}" class="mt-2 flex gap-1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <input name="name" placeholder="分组名称" required
+                     class="flex-1 px-2 py-1 text-sm border border-slate-300 rounded" />
+              <button type="submit" class="px-2 py-1 text-sm bg-indigo-600 text-white rounded">创建</button>
+            </form>
+          </div>
           {% endif %}
           {% if can_manage %}
             <a href="{{ url_for('kb.members', kb_id=kb.id) }}"
@@ -61,13 +75,62 @@
           {% endif %}
         </div>
         {% endif %}
-        <div class="px-3 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
-          <span>文档列表</span>
-          {% if tree %}<span class="text-slate-300">{{ tree|length }}</span>{% endif %}
-        </div>
+
+        {# 文档列表（分组模式）#}
         <div class="p-2 max-h-[60vh] overflow-y-auto">
           {% if tree %}
-            <ul>{% for node in tree %}{{ render_node(node) }}{% endfor %}</ul>
+            {% for section in tree %}
+              {% if section.group %}
+                {# 分组标题 #}
+                <div x-data="{ expanded: true, editing: false }" class="mt-2 first:mt-0 drop-zone" data-group-id="{{ section.group.id }}">
+                  <div class="flex items-center gap-1 px-2 py-1 group">
+                    <button @click="expanded = !expanded" class="text-xs text-slate-400" title="展开/折叠">
+                      <span x-text="expanded ? '▼' : '▶'"></span>
+                    </button>
+                    <span x-show="!editing" class="text-xs font-medium text-slate-500 uppercase tracking-wide truncate flex-1">📁 {{ section.group.name }}</span>
+                    {% if can_edit %}
+                    <button x-show="!editing" @click="editing = true" class="hidden group-hover:inline text-xs text-slate-400 hover:text-indigo-600" title="重命名">✏️</button>
+                    <form x-show="editing" x-cloak method="post"
+                          action="{{ url_for('kb.rename_group', kb_id=kb.id, group_id=section.group.id) }}"
+                          class="flex-1 flex gap-1">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <input name="name" value="{{ section.group.name }}" class="flex-1 px-1 py-0.5 text-xs border border-slate-300 rounded" />
+                      <button type="submit" class="text-xs text-indigo-600">✓</button>
+                      <button type="button" @click="editing = false" class="text-xs text-slate-400">✗</button>
+                    </form>
+                    <form x-show="!editing" method="post"
+                          action="{{ url_for('kb.delete_group', kb_id=kb.id, group_id=section.group.id) }}"
+                          onsubmit="return confirm('删除分组？文档将移至未分组')"
+                          class="hidden group-hover:inline">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <button class="text-xs text-slate-400 hover:text-rose-600" title="删除分组">🗑️</button>
+                    </form>
+                    {% endif %}
+                  </div>
+                  <ul x-show="expanded" class="ml-3 border-l border-slate-200 pl-1">
+                    {% for node in section.docs %}{{ render_node(node, 1) }}{% endfor %}
+                    {% if not section.docs %}
+                      <li class="text-xs text-slate-300 px-4 py-1">（空）</li>
+                    {% endif %}
+                  </ul>
+                </div>
+              {% else %}
+                {# 未分组文档 #}
+                <div class="drop-zone" data-group-id="">
+                <div class="px-2 pt-1 pb-0.5 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
+                  <span>未分组</span>
+                  {% if section.docs %}<span class="text-slate-300">{{ section.docs|length }}</span>{% endif %}
+                </div>
+                {% if section.docs %}
+                <ul>
+                  {% for node in section.docs %}{{ render_node(node) }}{% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-xs text-slate-300 px-4 py-1">（拖拽文档到此取消分组）</p>
+                {% endif %}
+                </div>
+              {% endif %}
+            {% endfor %}
           {% else %}
             <p class="text-xs text-slate-400 px-2 py-4 text-center">暂无文档</p>
           {% endif %}
@@ -108,4 +171,60 @@
     </aside>
   </div>
 </div>
+{% endblock %}
+
+{% block body_extra %}
+{% if can_edit %}
+<script>
+(function () {
+  var KB_ID = '{{ kb.id }}';
+  var draggingDocId = null;
+
+  // Drag start on doc items
+  document.querySelectorAll('[data-doc-id][draggable]').forEach(function (el) {
+    el.addEventListener('dragstart', function (e) {
+      draggingDocId = el.getAttribute('data-doc-id');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', draggingDocId);
+      el.style.opacity = '0.5';
+    });
+    el.addEventListener('dragend', function () {
+      el.style.opacity = '';
+      draggingDocId = null;
+      document.querySelectorAll('.drop-zone').forEach(function (z) {
+        z.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+      });
+    });
+  });
+
+  // Drop zones
+  document.querySelectorAll('.drop-zone').forEach(function (zone) {
+    zone.addEventListener('dragover', function (e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      zone.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+    });
+    zone.addEventListener('dragleave', function () {
+      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+    });
+    zone.addEventListener('drop', function (e) {
+      e.preventDefault();
+      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+      var docId = e.dataTransfer.getData('text/plain');
+      if (!docId) return;
+      var groupId = zone.getAttribute('data-group-id') || '';
+      var url = '/kb/' + KB_ID + '/docs/' + docId + '/move-group';
+      fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ group_id: groupId })
+      }).then(function (r) {
+        if (r.ok) { location.reload(); }
+        else { alert('移动失败'); }
+      }).catch(function () { alert('网络错误'); });
+    });
+  });
+})();
+</script>
+{% endif %}
 {% endblock %}

@@ -18,16 +18,15 @@
 - [app/__init__.py](file://app/__init__.py)
 - [app/templates/ai/index.html](file://app/templates/ai/index.html)
 - [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
+- [app/templates/ai/new.html](file://app/templates/ai/new.html)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 新增AI知识库蓝图路由的完整文档
-- 添加AI知识库CRUD操作、源文档管理、构建状态监控的详细说明
-- 补充Wiki浏览、聊天功能和权限控制机制
-- 更新架构图和组件关系说明
-- 添加RESTful API定义和调用示例
-- 完善WebSocket实时推送和文件上传处理说明
+- 更新AI知识库蓝图路由文档以反映 /new 路由方法扩展
+- 新增GET和POST方法支持的详细说明，提升用户体验
+- 补充AI知识库创建表单的完整交互流程
+- 更新RESTful API定义和调用示例
 
 ## 目录
 1. [简介](#简介)
@@ -108,7 +107,7 @@ DOCS --> DOCM
   - 内部通过服务层执行异步构建与链接解析
 - 知识库蓝图
   - 提供知识库列表、新建、详情、编辑、删除、成员管理等页面路由
-  - 基于服务层进行访问控制与成员增删
+  - 于服务层进行访问控制与成员增删
 - 文档蓝图
   - 提供文档树展示、创建、编辑、保存JSON、删除、分享等
   - 支持隐私控制与分享令牌生成
@@ -122,7 +121,7 @@ DOCS --> DOCM
   - 开放AI相关配置项、CSRF与登录管理、蓝图注册
 
 **章节来源**
-- [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
+- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
@@ -160,11 +159,11 @@ A-->>C : "重定向并提示任务已启动"
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
+- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 **章节来源**
-- [app/blueprints/ai.py:143-174](file://app/blueprints/ai.py#L143-L174)
+- [app/blueprints/ai.py:145-176](file://app/blueprints/ai.py#L145-L176)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 ## 详细组件分析
@@ -172,7 +171,7 @@ A-->>C : "重定向并提示任务已启动"
 ### AI知识库蓝图（/ai）
 - 路由与职责
   - GET /ai/：列出当前用户的所有AI知识库
-  - POST /ai/new：创建AI知识库（名称、描述、模型、RAG开关）
+  - GET/POST /ai/new：创建AI知识库（名称、描述、模型、RAG开关）
   - GET /ai/<int:ai_kb_id>：AI知识库详情（源、文章、红链统计）
   - POST /ai/<int:ai_kb_id>/edit：编辑AI知识库（名称、描述、模型、RAG）
   - POST /ai/<int:ai_kb_id>/delete：删除AI知识库
@@ -193,24 +192,27 @@ A-->>C : "重定向并提示任务已启动"
 - 数据模型
   - AI知识库、源文档、文章、链接、分块（可选RAG）
 
+**更新** 新增GET方法支持AI知识库创建表单直接访问，提升用户体验
+
 ```mermaid
 flowchart TD
-Start(["进入 /ai/<int:ai_kb_id>"]) --> LoadKB["加载AI知识库并校验权限"]
-LoadKB --> Access{"can_access 当前用户"}
-Access --> |否| Forbidden["返回 403"]
-Access --> |是| Status["检查构建状态"]
-Status --> Build{"状态为 BUILDING?"}
-Build --> |是| Wait["提示等待"]
-Build --> |否| Ready["允许查看详情"]
-Ready --> Render["渲染详情页"]
+Start(["进入 /ai/new"]) --> Method{"请求方法"}
+Method --> |GET| Form["渲染创建表单"]
+Method --> |POST| Validate["验证表单数据"]
+Form --> RenderForm["显示名称、描述、模型、RAG选项"]
+Validate --> Valid{"名称是否为空"}
+Valid --> |是| Error["显示错误并保留表单数据"]
+Valid --> |否| Create["创建AI知识库"]
+Create --> Success["重定向到详情页"]
+Error --> Redirect["重定向回创建页"]
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:55-62](file://app/blueprints/ai.py#L55-L62)
-- [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
+- [app/blueprints/ai.py:34-54](file://app/blueprints/ai.py#L34-L54)
+- [app/templates/ai/new.html:6-31](file://app/templates/ai/new.html#L6-L31)
 
 **章节来源**
-- [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
+- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
 
@@ -293,7 +295,7 @@ E --> |是| OK["允许访问"]
   - 若需实时状态推送，可在AI构建状态查询接口基础上引入WebSocket（如Flask-SocketIO），在构建状态变更时推送至订阅客户端
 
 **章节来源**
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
+- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
 
 ### 文件上传、批量处理与进度跟踪
 - 文件上传
@@ -305,14 +307,14 @@ E --> |是| OK["允许访问"]
   - 源文档状态枚举：PENDING、PROCESSING、PROCESSED、FAILED
 
 **章节来源**
-- [app/blueprints/ai.py:108-126](file://app/blueprints/ai.py#L108-L126)
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
+- [app/blueprints/ai.py:110-128](file://app/blueprints/ai.py#L110-L128)
+- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
 - [app/models/ai_kb.py:15-19](file://app/models/ai_kb.py#L15-L19)
 
 ### RESTful API定义与调用示例
 - AI知识库（/ai）
   - GET /ai/：返回当前用户的所有AI知识库
-  - POST /ai/new：表单字段 name, description, chat_model, enable_rag
+  - GET/POST /ai/new：GET返回创建表单，POST创建AI知识库（表单字段 name, description, chat_model, enable_rag）
   - GET /ai/<int:ai_kb_id>：返回AI知识库详情
   - POST /ai/<int:ai_kb_id>/edit：表单字段 name, description, chat_model, enable_rag
   - POST /ai/<int:ai_kb_id>/delete：删除AI知识库
@@ -325,7 +327,7 @@ E --> |是| OK["允许访问"]
   - GET /ai/<int:ai_kb_id>/wiki/<slug>：返回文章HTML与反链
   - POST /ai/<int:ai_kb_id>/wiki/<slug>/regenerate：重生单篇文章
   - GET /ai/<int:ai_kb_id>/graph：返回图谱数据
-  - GET/POST /ai/<int:ai_kb_id>/chat：POST表单字段 q；成功返回 {ok:true, answer}，失败返回 {ok:false, error}
+  - GET/POST /ai/<int:ai_kb_id>/chat：GET返回聊天界面，POST表单字段 q；成功返回 {ok:true, answer}，失败返回 {ok:false, error}
 - 知识库（/kb）
   - GET /kb/?tab=mine|public：返回知识库列表
   - POST /kb/new：表单字段 name, description, visibility, icon
@@ -343,8 +345,10 @@ E --> |是| OK["允许访问"]
   - GET/POST /doc/<int:doc_id>/share：表单字段 password, ttl_hours
   - POST /doc/share/<int:share_id>/revoke：撤销分享
 
+**更新** 新增GET/POST方法支持，特别是 /ai/new 路由现在同时支持GET和POST方法
+
 **章节来源**
-- [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
+- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
 
@@ -359,10 +363,13 @@ E --> |是| OK["允许访问"]
 - 典型场景
   - AI聊天输入为空：返回 {ok: false, error: "请输入问题"}
   - 构建任务已在运行：页面提示"正在生成，请稍候"
+  - 创建AI知识库名称为空：页面提示"请输入名称"
+
+**更新** 新增创建AI知识库名称验证错误处理
 
 **章节来源**
-- [app/blueprints/ai.py:265-278](file://app/blueprints/ai.py#L265-L278)
-- [app/blueprints/ai.py:147-149](file://app/blueprints/ai.py#L147-L149)
+- [app/blueprints/ai.py:267-281](file://app/blueprints/ai.py#L267-L281)
+- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
 
 ### 参数验证规则与安全考虑
 - 参数验证
@@ -393,7 +400,7 @@ E --> |是| OK["允许访问"]
 
 **章节来源**
 - [app/blueprints/ai.py:29](file://app/blueprints/ai.py#L29)
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
+- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
 - [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
 - [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
 
@@ -454,6 +461,7 @@ CFG --> APP["应用工厂"]
   - 404资源不存在：确认知识库/文档/文章ID有效且未归档/删除
   - 构建失败：查看AI知识库错误信息字段，定位具体异常
   - 聊天无结果：确认知识库已生成文章，或开启RAG后提供有效模型配置
+  - 创建失败：检查名称是否为空，查看错误提示
 - 调试步骤
   - 查看状态接口返回的错误信息与最后构建时间
   - 检查源文档状态是否全部为PROCESSED
@@ -463,13 +471,15 @@ CFG --> APP["应用工厂"]
   - 关注数据库慢查询与锁等待
   - 对接日志系统记录关键事件（构建开始/结束、失败原因）
 
+**更新** 新增创建AI知识库失败的调试指导
+
 **章节来源**
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
+- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/config.py:37-47](file://app/config.py#L37-L47)
 
 ## 结论
-AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
+AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。最新的 /ai/new 路由方法扩展显著提升了用户体验，允许直接访问AI知识库创建表单。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
 
 ## 附录
 - 配置项要点

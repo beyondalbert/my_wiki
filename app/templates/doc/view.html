@@ -18,11 +18,46 @@
 <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
   <div class="grid grid-cols-12 gap-6">
     <aside class="col-span-3 lg:col-span-2">
-      <div class="bg-white border border-slate-200 rounded-xl">
+      <div class="bg-white border border-slate-200 rounded-xl sticky top-20">
         <div class="p-3 border-b border-slate-100">
           <a href="{{ url_for('kb.detail', kb_id=kb.id) }}" class="font-semibold text-slate-800 truncate hover:text-indigo-600">{{ kb.name }}</a>
         </div>
-        <div class="p-2 max-h-[70vh] overflow-y-auto">
+        {# 操作区：与知识库详情页保持一致，方便快速创建 #}
+        {% if can_edit or can_manage %}
+        <div class="p-2 border-b border-slate-100 space-y-2">
+          {% if can_edit %}
+          <form method="post" action="{{ url_for('doc.new_doc') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="kb_id" value="{{ kb.id }}" />
+            <input type="hidden" name="type" value="doc" />
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium">
+              <span>📄</span><span>新建文档</span>
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('doc.new_doc') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="kb_id" value="{{ kb.id }}" />
+            <input type="hidden" name="type" value="sheet" />
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium">
+              <span>📊</span><span>新建表格</span>
+            </button>
+          </form>
+          {% endif %}
+          {% if can_manage %}
+            <a href="{{ url_for('kb.members', kb_id=kb.id) }}"
+               class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border border-slate-200 rounded">
+              <span>👥</span><span>成员管理</span>
+            </a>
+          {% endif %}
+        </div>
+        {% endif %}
+        <div class="px-3 pt-2 pb-1 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
+          <span>文档列表</span>
+          {% if tree %}<span class="text-slate-300">{{ tree|length }}</span>{% endif %}
+        </div>
+        <div class="p-2 max-h-[60vh] overflow-y-auto">
           <ul>{% for n in tree %}{{ render_node(n, doc.id) }}{% endfor %}</ul>
         </div>
       </div>

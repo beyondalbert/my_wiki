@@ -58,6 +58,16 @@ VENDORS: list[tuple[str, str]] = [
      "https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"),
     ("js/toastui-editor-i18n-zh-cn.js",
      "https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/i18n/zh-cn.js"),
+    # x-data-spreadsheet (Excel-like online sheet, MIT)
+    ("css/xspreadsheet.css",
+     "https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/xspreadsheet.css"),
+    # 工具栏图标 SVG sprite。必须与 xspreadsheet.css 同目录(CSS 里是相对 url 引用)
+    ("css/58eaeb4e52248a5c75936c6f4c33a370.svg",
+     "https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/58eaeb4e52248a5c75936c6f4c33a370.svg"),
+    ("js/xspreadsheet.js",
+     "https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/xspreadsheet.js"),
+    ("js/xspreadsheet-zh-cn.js",
+     "https://cdn.jsdelivr.net/npm/x-data-spreadsheet@1.1.9/dist/locale/zh-cn.js"),
     # highlight.js
     ("js/highlight.min.js",
      "https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/lib/index.min.js"),

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ doc.title }} · {{ site_name }}{% endblock %}
+{% set is_sheet = (doc.type == 'sheet') %}
 
 {% macro render_node(node, current_id, level=0) %}
   <li>
@@ -27,10 +28,16 @@
       </div>
     </aside>
 
-    <main class="col-span-9 lg:col-span-7">
+    <main class="{{ 'col-span-9 lg:col-span-10' if is_sheet else 'col-span-9 lg:col-span-7' }}">
       <div class="bg-white border border-slate-200 rounded-xl p-8">
         <div class="flex items-center justify-between gap-2 mb-3">
-          <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
+          <div class="flex items-center gap-2 min-w-0">
+            <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
+            <span class="text-xs px-2 py-0.5 rounded-full shrink-0"
+                  style="{{ 'background-color:#ecfdf5; color:#047857;' if is_sheet else 'background-color:#eef2ff; color:#4338ca;' }}">
+              {{ '📊 表格' if is_sheet else '📄 文档' }}
+            </span>
+          </div>
           <div class="flex gap-2 shrink-0">
             {% if can_edit %}
               <a href="{{ url_for('doc.edit', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">编辑</a>
@@ -43,11 +50,16 @@
         <div class="text-xs text-slate-400 mb-6">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}
           {% if doc.privacy == 'private' %}· <span style="color:#e11d48;">🔒 私密</span>{% endif %}
         </div>
-        <div id="viewer"></div>
-        <p id="empty-tip" class="hidden text-slate-400">暂无内容，<a class="text-indigo-600 hover:underline" href="{{ url_for('doc.edit', doc_id=doc.id) }}">点此开始编辑</a>。</p>
+        {% if is_sheet %}
+          <div id="sheet-viewer" class="border border-slate-200 rounded overflow-auto" style="min-height:600px;"></div>
+        {% else %}
+          <div id="viewer"></div>
+        {% endif %}
+        <p id="empty-tip" class="hidden text-slate-400">暂无内容{% if can_edit %}，<a class="text-indigo-600 hover:underline" href="{{ url_for('doc.edit', doc_id=doc.id) }}">点此开始编辑</a>{% endif %}。</p>
       </div>
     </main>
 
+    {% if not is_sheet %}
     <aside class="hidden lg:block lg:col-span-3">
       <div class="bg-white border border-slate-200 rounded-xl p-4 sticky top-20 outline">
         <div class="font-semibold text-slate-800 mb-2">大纲</div>
@@ -60,35 +72,60 @@
         {% endif %}
       </div>
     </aside>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
-<script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+{% if is_sheet %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/xspreadsheet.css') }}" />
+  <script src="{{ url_for('static', filename='vendor/js/xspreadsheet.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/js/xspreadsheet-zh-cn.js') }}"></script>
+  <style>
+    #sheet-viewer .x-spreadsheet { width: 100% !important; }
+  </style>
+{% else %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
+  <script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+{% endif %}
 {% endblock %}
 
 {% block body_extra %}
 <script>
 (function () {
-  const md = {{ (doc.content_json or "")|tojson }};
-  const target = document.getElementById('viewer');
-  if (!md || !md.trim()) {
-    target.classList.add('hidden');
-    document.getElementById('empty-tip').classList.remove('hidden');
-    return;
+  const IS_SHEET = {{ 'true' if is_sheet else 'false' }};
+  const raw = {{ (doc.content_json or "")|tojson }};
+  const empty = !raw || !raw.trim();
+
+  if (IS_SHEET) {
+    const target = document.getElementById('sheet-viewer');
+    if (empty) { target.classList.add('hidden'); document.getElementById('empty-tip').classList.remove('hidden'); return; }
+    if (typeof x_spreadsheet === 'undefined') {
+      target.textContent = '表格引擎未加载'; return;
+    }
+    try { x_spreadsheet.locale('zh-cn'); } catch (e) {}
+    let data = null;
+    try { data = JSON.parse(raw); } catch (e) { console.error('表格 JSON 解析失败', e); target.textContent = '表格数据已损坏'; return; }
+    const sheet = x_spreadsheet(target, {
+      mode: 'read',
+      showToolbar: false,
+      showGrid: true,
+      showContextmenu: false,
+      view: { height: () => 600, width: () => target.clientWidth || 1000 },
+    });
+    if (data) sheet.loadData(data);
+  } else {
+    const target = document.getElementById('viewer');
+    if (empty) { target.classList.add('hidden'); document.getElementById('empty-tip').classList.remove('hidden'); return; }
+    if (typeof toastui === 'undefined' || !toastui.Editor) { target.textContent = raw; return; }
+    toastui.Editor.factory({
+      el: target,
+      viewer: true,
+      initialValue: raw,
+      usageStatistics: false,
+    });
   }
-  if (typeof toastui === 'undefined' || !toastui.Editor) {
-    target.textContent = md;
-    return;
-  }
-  toastui.Editor.factory({
-    el: target,
-    viewer: true,
-    initialValue: md,
-    usageStatistics: false,
-  });
 })();
 </script>
 {% endblock %}

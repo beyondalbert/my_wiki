@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}编辑 · {{ doc.title }}{% endblock %}
+{% set is_sheet = (doc.type == 'sheet') %}
 {% block content %}
 <div class="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
   <div class="flex items-center gap-3 mb-4">
@@ -7,8 +8,8 @@
     <span class="text-slate-300">|</span>
     <span class="text-sm text-slate-500">所属：<a class="hover:text-indigo-600" href="{{ url_for('kb.detail', kb_id=kb.id) }}">{{ kb.name }}</a></span>
     <span class="text-xs px-2 py-0.5 rounded-full"
-          style="{{ 'background-color:#eef2ff; color:#4338ca;' if doc.type=='doc' else 'background-color:#ecfdf5; color:#047857;' }}">
-      {{ '📄 文档' if doc.type=='doc' else '📊 表格' }}
+          style="{{ 'background-color:#ecfdf5; color:#047857;' if is_sheet else 'background-color:#eef2ff; color:#4338ca;' }}">
+      {{ '📊 表格' if is_sheet else '📄 文档' }}
     </span>
     <span id="save-status" class="ml-auto text-xs text-slate-400">未变更</span>
   </div>
@@ -25,7 +26,11 @@
       </label>
       <button id="btn-save" class="ml-auto px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">保存 (Ctrl+S)</button>
     </div>
-    <div id="editor"></div>
+    {% if is_sheet %}
+      <div id="sheet" class="border border-slate-200 rounded overflow-auto" style="min-height:600px;"></div>
+    {% else %}
+      <div id="editor"></div>
+    {% endif %}
     <div id="editor-error" class="hidden mt-3 p-3 rounded-lg text-sm"
          style="background-color:#fef2f2; color:#b91c1c; border:1px solid #fecaca;"></div>
   </div>
@@ -33,80 +38,110 @@
 {% endblock %}
 
 {% block head_extra %}
-<link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
-<script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/toastui-editor-i18n-zh-cn.js') }}"></script>
-<style>
-  /* 保证编辑器容器有明确高度,则 Toast UI 内部 height:100% 才能生效 */
-  #editor { min-height: 600px; }
-  #editor .toastui-editor-defaultUI { border-radius: 0.5rem; }
-</style>
+{% if is_sheet %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/xspreadsheet.css') }}" />
+  <script src="{{ url_for('static', filename='vendor/js/xspreadsheet.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/js/xspreadsheet-zh-cn.js') }}"></script>
+  <style>
+    /* x-spreadsheet 默认按 window.innerHeight 计算,这里强制贴合容器 */
+    #sheet .x-spreadsheet { width: 100% !important; }
+  </style>
+{% else %}
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
+  <script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/js/toastui-editor-i18n-zh-cn.js') }}"></script>
+  <style>
+    #editor { min-height: 600px; }
+    #editor .toastui-editor-defaultUI { border-radius: 0.5rem; }
+  </style>
+{% endif %}
 {% endblock %}
 
 {% block body_extra %}
 <script>
 (function () {
   const SAVE_URL = "{{ url_for('doc.save', doc_id=doc.id) }}";
+  const IS_SHEET = {{ 'true' if is_sheet else 'false' }};
   const status = document.getElementById('save-status');
   const errBox = document.getElementById('editor-error');
-  const holder = document.getElementById('editor');
 
   function showError(msg) {
     errBox.classList.remove('hidden');
     errBox.textContent = msg;
     console.error('[editor]', msg);
   }
+  function markDirty() { status.textContent = '已修改'; status.style.color = '#b45309'; }
 
-  console.log('[editor] toastui =', typeof toastui, toastui);
-  if (typeof toastui === 'undefined' || !toastui.Editor) {
-    showError('富文本引擎 Toast UI Editor 未加载(window.toastui 未定义)。请检查网络面板中 toastui-editor-all.min.js 是否 200 OK。');
-    return;
-  }
-  if (!holder) {
-    showError('找不到 #editor 容器');
-    return;
-  }
+  const initialRaw = {{ (doc.content_json or "")|tojson }};
+  let getPayload = null;  // () => string  序列化当前内容
 
-  const initialValue = {{ (doc.content_json or "")|tojson }};
-  console.log('[editor] initialValue length =', (initialValue || '').length);
-
-  let editor;
-  try {
-    editor = new toastui.Editor({
-      el: holder,
-      height: '600px',
-      initialEditType: 'wysiwyg',
-      previewStyle: 'vertical',
-      usageStatistics: false,
-      hideModeSwitch: false,
-      initialValue: typeof initialValue === 'string' ? initialValue : '',
-      placeholder: '在此开始书写… 上方工具栏可一键插入标题/列表/表格/代码块',
-      events: {
-        change: () => {
-          status.textContent = '已修改';
-          status.style.color = '#b45309';
-        }
-      }
+  if (IS_SHEET) {
+    // ---------- 在线表格 ----------
+    if (typeof x_spreadsheet === 'undefined') {
+      showError('表格引擎 x-spreadsheet 未加载,请检查 vendor/js/xspreadsheet.js'); return;
+    }
+    try { x_spreadsheet.locale('zh-cn'); } catch (e) { /* 容错 */ }
+    let initialData = null;
+    if (initialRaw && initialRaw.trim()) {
+      try { initialData = JSON.parse(initialRaw); } catch (e) { console.warn('表格数据解析失败,以空白开始', e); }
+    }
+    const holder = document.getElementById('sheet');
+    const sheet = x_spreadsheet(holder, {
+      mode: 'edit',
+      showToolbar: true,
+      showGrid: true,
+      showContextmenu: true,
+      view: {
+        height: () => 600,
+        width: () => holder.clientWidth || 1000,
+      },
+      row: { len: 100, height: 25 },
+      col: { len: 26, width: 100, indexWidth: 60, minWidth: 60 },
     });
-    console.log('[editor] created OK', editor);
-  } catch (e) {
-    showError('Toast UI Editor 创建失败: ' + (e && e.message || e));
-    console.error(e);
-    return;
+    if (initialData) {
+      try { sheet.loadData(initialData); } catch (e) { console.warn('loadData 失败', e); }
+    }
+    sheet.change(() => markDirty());
+    getPayload = () => JSON.stringify(sheet.getData());
+    console.log('[editor] x-spreadsheet 初始化完成');
+  } else {
+    // ---------- Markdown 富文本 ----------
+    if (typeof toastui === 'undefined' || !toastui.Editor) {
+      showError('富文本引擎 Toast UI Editor 未加载(window.toastui 未定义)。请检查 vendor/js/toastui-editor-all.min.js 是否 200 OK。');
+      return;
+    }
+    const holder = document.getElementById('editor');
+    if (!holder) { showError('找不到 #editor 容器'); return; }
+    let editor;
+    try {
+      editor = new toastui.Editor({
+        el: holder,
+        height: '600px',
+        initialEditType: 'wysiwyg',
+        previewStyle: 'vertical',
+        usageStatistics: false,
+        hideModeSwitch: false,
+        initialValue: typeof initialRaw === 'string' ? initialRaw : '',
+        placeholder: '在此开始书写… 上方工具栏可一键插入标题/列表/表格/代码块',
+        events: { change: () => markDirty() },
+      });
+    } catch (e) {
+      showError('Toast UI Editor 创建失败: ' + (e && e.message || e));
+      console.error(e); return;
+    }
+    getPayload = () => editor.getMarkdown();
   }
 
   async function save() {
-    if (!editor) return;
-    status.textContent = '保存中…';
-    status.style.color = '';
+    if (!getPayload) return;
+    status.textContent = '保存中…'; status.style.color = '';
     try {
-      const md = editor.getMarkdown();
       const r = await fetch(SAVE_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: document.getElementById('doc-title').value || '未命名',
-          content_json: md,
+          content_json: getPayload(),
           privacy: document.getElementById('doc-privacy').value,
         }),
       });
@@ -118,8 +153,7 @@
         status.style.color = '#b91c1c';
       }
     } catch (e) {
-      status.textContent = '保存异常';
-      status.style.color = '#b91c1c';
+      status.textContent = '保存异常'; status.style.color = '#b91c1c';
       console.error(e);
     }
   }

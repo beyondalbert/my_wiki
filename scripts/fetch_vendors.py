@@ -48,6 +48,16 @@ VENDORS: list[tuple[str, str]] = [
      "https://cdn.jsdelivr.net/npm/@editorjs/marker@1.4.0/dist/marker.umd.min.js"),
     ("js/editorjs/delimiter.min.js",
      "https://cdn.jsdelivr.net/npm/@editorjs/delimiter@1.4.2/dist/delimiter.umd.min.js"),
+    # Toast UI Editor (Markdown + WYSIWYG, top toolbar)
+    ("css/toastui-editor.min.css",
+     "https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor.min.css"),
+    ("css/toastui-editor-viewer.min.css",
+     "https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/toastui-editor-viewer.min.css"),
+    # 注意:必须用 -all 一体化版本(自带 prosemirror-* 8 个依赖),否则浏览器加载会找不到依赖
+    ("js/toastui-editor-all.min.js",
+     "https://uicdn.toast.com/editor/latest/toastui-editor-all.min.js"),
+    ("js/toastui-editor-i18n-zh-cn.js",
+     "https://cdn.jsdelivr.net/npm/@toast-ui/editor@3.2.2/dist/i18n/zh-cn.js"),
     # highlight.js
     ("js/highlight.min.js",
      "https://cdn.jsdelivr.net/npm/highlight.js@11.10.0/lib/index.min.js"),

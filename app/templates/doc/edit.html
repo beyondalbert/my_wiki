@@ -6,6 +6,10 @@
     <a href="{{ url_for('doc.view', doc_id=doc.id) }}" class="text-sm text-slate-500 hover:text-indigo-600">← 退出编辑</a>
     <span class="text-slate-300">|</span>
     <span class="text-sm text-slate-500">所属：<a class="hover:text-indigo-600" href="{{ url_for('kb.detail', kb_id=kb.id) }}">{{ kb.name }}</a></span>
+    <span class="text-xs px-2 py-0.5 rounded-full"
+          style="{{ 'background-color:#eef2ff; color:#4338ca;' if doc.type=='doc' else 'background-color:#ecfdf5; color:#047857;' }}">
+      {{ '📄 文档' if doc.type=='doc' else '📊 表格' }}
+    </span>
     <span id="save-status" class="ml-auto text-xs text-slate-400">未变更</span>
   </div>
   <div class="bg-white border border-slate-200 rounded-xl p-6">
@@ -13,7 +17,7 @@
            class="w-full text-3xl font-bold text-slate-800 outline-none border-0 focus:ring-0 mb-4" />
     <div class="flex items-center gap-3 mb-4 text-sm">
       <label class="inline-flex items-center gap-1">
-        <span class="text-slate-500">类型：</span>
+        <span class="text-slate-500">隐私：</span>
         <select id="doc-privacy" class="px-2 py-1 border border-slate-200 rounded">
           <option value="normal" {{ 'selected' if doc.privacy=='normal' }}>常规</option>
           <option value="private" {{ 'selected' if doc.privacy=='private' }}>私密</option>
@@ -21,22 +25,22 @@
       </label>
       <button id="btn-save" class="ml-auto px-3 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">保存 (Ctrl+S)</button>
     </div>
-    <div id="editorjs" class="border border-slate-100 rounded-lg p-4 min-h-[400px]"></div>
+    <div id="editor"></div>
+    <div id="editor-error" class="hidden mt-3 p-3 rounded-lg text-sm"
+         style="background-color:#fef2f2; color:#b91c1c; border:1px solid #fecaca;"></div>
   </div>
 </div>
 {% endblock %}
 
 {% block head_extra %}
-<script src="{{ url_for('static', filename='vendor/js/editorjs/editor.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/header.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/list.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/checklist.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/quote.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/code.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/inline-code.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/table.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/marker.min.js') }}"></script>
-<script src="{{ url_for('static', filename='vendor/js/editorjs/delimiter.min.js') }}"></script>
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
+<script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/js/toastui-editor-i18n-zh-cn.js') }}"></script>
+<style>
+  /* 保证编辑器容器有明确高度,则 Toast UI 内部 height:100% 才能生效 */
+  #editor { min-height: 600px; }
+  #editor .toastui-editor-defaultUI { border-radius: 0.5rem; }
+</style>
 {% endblock %}
 
 {% block body_extra %}
@@ -44,45 +48,79 @@
 (function () {
   const SAVE_URL = "{{ url_for('doc.save', doc_id=doc.id) }}";
   const status = document.getElementById('save-status');
-  let initialData = null;
-  try { initialData = {{ doc.content_json|tojson if doc.content_json else 'null' }}; if (typeof initialData==='string') initialData=JSON.parse(initialData); } catch(e){ initialData = null; }
+  const errBox = document.getElementById('editor-error');
+  const holder = document.getElementById('editor');
 
-  const editor = new EditorJS({
-    holder: 'editorjs',
-    placeholder: '在此开始书写……',
-    data: initialData || { blocks: [] },
-    tools: {
-      header: { class: Header, inlineToolbar: ['marker','inlineCode'] },
-      list:   { class: List,   inlineToolbar: true },
-      checklist: { class: Checklist, inlineToolbar: true },
-      quote:  { class: Quote, inlineToolbar: true },
-      code:   { class: CodeTool },
-      inlineCode: { class: InlineCode },
-      table:  { class: Table, inlineToolbar: true, config: { rows: 2, cols: 2 } },
-      marker: { class: Marker },
-      delimiter: { class: Delimiter },
-    },
-    onChange: () => { status.textContent = '已修改'; status.className='ml-auto text-xs text-amber-500'; }
-  });
+  function showError(msg) {
+    errBox.classList.remove('hidden');
+    errBox.textContent = msg;
+    console.error('[editor]', msg);
+  }
+
+  console.log('[editor] toastui =', typeof toastui, toastui);
+  if (typeof toastui === 'undefined' || !toastui.Editor) {
+    showError('富文本引擎 Toast UI Editor 未加载(window.toastui 未定义)。请检查网络面板中 toastui-editor-all.min.js 是否 200 OK。');
+    return;
+  }
+  if (!holder) {
+    showError('找不到 #editor 容器');
+    return;
+  }
+
+  const initialValue = {{ (doc.content_json or "")|tojson }};
+  console.log('[editor] initialValue length =', (initialValue || '').length);
+
+  let editor;
+  try {
+    editor = new toastui.Editor({
+      el: holder,
+      height: '600px',
+      initialEditType: 'wysiwyg',
+      previewStyle: 'vertical',
+      usageStatistics: false,
+      hideModeSwitch: false,
+      initialValue: typeof initialValue === 'string' ? initialValue : '',
+      placeholder: '在此开始书写… 上方工具栏可一键插入标题/列表/表格/代码块',
+      events: {
+        change: () => {
+          status.textContent = '已修改';
+          status.style.color = '#b45309';
+        }
+      }
+    });
+    console.log('[editor] created OK', editor);
+  } catch (e) {
+    showError('Toast UI Editor 创建失败: ' + (e && e.message || e));
+    console.error(e);
+    return;
+  }
 
   async function save() {
+    if (!editor) return;
     status.textContent = '保存中…';
-    const out = await editor.save();
-    const r = await fetch(SAVE_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: document.getElementById('doc-title').value || '未命名',
-        content_json: JSON.stringify(out),
-        privacy: document.getElementById('doc-privacy').value,
-      }),
-    });
-    if (r.ok) {
-      status.textContent = '已保存 · ' + new Date().toLocaleTimeString();
-      status.className = 'ml-auto text-xs text-emerald-600';
-    } else {
-      status.textContent = '保存失败';
-      status.className = 'ml-auto text-xs text-rose-600';
+    status.style.color = '';
+    try {
+      const md = editor.getMarkdown();
+      const r = await fetch(SAVE_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: document.getElementById('doc-title').value || '未命名',
+          content_json: md,
+          privacy: document.getElementById('doc-privacy').value,
+        }),
+      });
+      if (r.ok) {
+        status.textContent = '已保存 · ' + new Date().toLocaleTimeString();
+        status.style.color = '#047857';
+      } else {
+        status.textContent = '保存失败 (' + r.status + ')';
+        status.style.color = '#b91c1c';
+      }
+    } catch (e) {
+      status.textContent = '保存异常';
+      status.style.color = '#b91c1c';
+      console.error(e);
     }
   }
   document.getElementById('btn-save').addEventListener('click', save);

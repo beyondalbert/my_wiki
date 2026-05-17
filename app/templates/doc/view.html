@@ -41,12 +41,10 @@
           </div>
         </div>
         <div class="text-xs text-slate-400 mb-6">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}
-          {% if doc.privacy == 'private' %}· <span class="text-rose-500">🔒 私密</span>{% endif %}
+          {% if doc.privacy == 'private' %}· <span style="color:#e11d48;">🔒 私密</span>{% endif %}
         </div>
-        <div id="doc-content" class="prose prose-slate max-w-none">
-          {# Rendered by Editor.js JSON via JS for now: dump JSON for simple paragraphs #}
-          <div id="doc-json" class="text-slate-700 whitespace-pre-wrap text-sm"></div>
-        </div>
+        <div id="viewer"></div>
+        <p id="empty-tip" class="hidden text-slate-400">暂无内容，<a class="text-indigo-600 hover:underline" href="{{ url_for('doc.edit', doc_id=doc.id) }}">点此开始编辑</a>。</p>
       </div>
     </main>
 
@@ -66,49 +64,31 @@
 </div>
 {% endblock %}
 
+{% block head_extra %}
+<link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
+<script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+{% endblock %}
+
 {% block body_extra %}
 <script>
-  // Minimal renderer: render Editor.js blocks to HTML for read-only view
-  (function () {
-    const raw = {{ doc.content_json|tojson if doc.content_json else 'null' }};
-    const target = document.getElementById('doc-content');
-    if (!raw) { target.innerHTML = '<p class="text-slate-400">暂无内容</p>'; return; }
-    let data;
-    try { data = (typeof raw === 'string') ? JSON.parse(raw) : raw; } catch (e) { target.textContent = raw; return; }
-    const blocks = data.blocks || [];
-    const html = blocks.map(b => {
-      const d = b.data || {};
-      switch (b.type) {
-        case 'header': {
-          const lv = Math.min(Math.max(d.level || 2, 1), 6);
-          const txt = d.text || '';
-          const anchor = (txt.replace(/\s+/g,'-').toLowerCase()).replace(/[^\w\u4e00-\u9fa5\-]/g,'');
-          return `<h${lv} id="${anchor}">${txt}</h${lv}>`;
-        }
-        case 'paragraph': return `<p>${d.text || ''}</p>`;
-        case 'list': {
-          const tag = d.style === 'ordered' ? 'ol' : 'ul';
-          const items = (d.items||[]).map(i => `<li>${i}</li>`).join('');
-          return `<${tag}>${items}</${tag}>`;
-        }
-        case 'checklist': {
-          return `<ul>${(d.items||[]).map(i => `<li>${i.checked?'☑':'☐'} ${i.text||''}</li>`).join('')}</ul>`;
-        }
-        case 'quote': return `<blockquote>${d.text||''}</blockquote>`;
-        case 'code':  return `<pre><code>${(d.code||'').replace(/</g,'&lt;')}</code></pre>`;
-        case 'delimiter': return '<hr/>';
-        case 'table': {
-          const rows = d.content || [];
-          return '<table class="border-collapse w-full text-sm">'+
-            rows.map((r,i)=>{
-              const tag = (i===0 && d.withHeadings) ? 'th' : 'td';
-              return '<tr>'+r.map(c=>`<${tag} class="border border-slate-200 px-2 py-1">${c}</${tag}>`).join('')+'</tr>';
-            }).join('')+'</table>';
-        }
-        default: return '';
-      }
-    }).join('');
-    target.innerHTML = html || '<p class="text-slate-400">暂无内容</p>';
-  })();
+(function () {
+  const md = {{ (doc.content_json or "")|tojson }};
+  const target = document.getElementById('viewer');
+  if (!md || !md.trim()) {
+    target.classList.add('hidden');
+    document.getElementById('empty-tip').classList.remove('hidden');
+    return;
+  }
+  if (typeof toastui === 'undefined' || !toastui.Editor) {
+    target.textContent = md;
+    return;
+  }
+  toastui.Editor.factory({
+    el: target,
+    viewer: true,
+    initialValue: md,
+    usageStatistics: false,
+  });
+})();
 </script>
 {% endblock %}

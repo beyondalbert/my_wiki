@@ -38,16 +38,24 @@
           {% endif %}
         </div>
         {% if can_edit %}
-        <div class="p-2 border-t border-slate-100">
-          <form method="post" action="{{ url_for('doc.new_doc') }}" class="flex gap-2">
+        <div class="p-2 border-t border-slate-100 space-y-2">
+          <form method="post" action="{{ url_for('doc.new_doc') }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <input type="hidden" name="kb_id" value="{{ kb.id }}" />
-            <input name="title" placeholder="新文档标题" class="flex-1 px-2 py-1 text-sm border border-slate-200 rounded" />
-            <select name="type" class="px-2 py-1 text-sm border border-slate-200 rounded">
-              <option value="doc">文档</option>
-              <option value="sheet">表格</option>
-            </select>
-            <button class="px-2 py-1 text-sm bg-indigo-600 text-white rounded">+</button>
+            <input type="hidden" name="type" value="doc" />
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium">
+              <span>📄</span><span>新建文档</span>
+            </button>
+          </form>
+          <form method="post" action="{{ url_for('doc.new_doc') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+            <input type="hidden" name="kb_id" value="{{ kb.id }}" />
+            <input type="hidden" name="type" value="sheet" />
+            <button type="submit"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 rounded font-medium">
+              <span>📊</span><span>新建表格</span>
+            </button>
           </form>
         </div>
         {% endif %}

@@ -1,9 +1,20 @@
-"""Editor.js content helpers: outline + plain text extraction."""
+"""Markdown content helpers: outline + plain text extraction.
+
+文档采用 Toast UI Editor 后,数据库字段 `content_json` 实际存储的是 Markdown 字符串
+(为避免破坏既有迁移,字段名保留)。本模块基于 Markdown 提供以下能力:
+
+- extract_outline(md): 提取 H1-H3 形成大纲
+- extract_plain_text(md): 去除 Markdown 标记,生成纯文本(供搜索/AI 使用)
+- extract_markdown(md): 兼容旧调用,直接返回 Markdown
+"""
 from __future__ import annotations
 
-import json
 import re
 from typing import Iterable
+
+
+_HEADING_RE = re.compile(r"^(#{1,6})\s+(.+?)\s*#*\s*$")
+_FENCE_RE = re.compile(r"^(```|~~~)")
 
 
 def _slugify_anchor(text: str) -> str:
@@ -13,40 +24,64 @@ def _slugify_anchor(text: str) -> str:
     return text or "section"
 
 
-def _strip_html(html: str) -> str:
-    if not html:
+def _strip_inline_md(text: str) -> str:
+    """去除 Markdown 行内格式标记,保留文字。"""
+    if not text:
         return ""
-    return re.sub(r"<[^>]+>", "", html)
+    # 图片 ![alt](url) -> alt
+    text = re.sub(r"!\[([^\]]*)\]\([^)]*\)", r"\1", text)
+    # 链接 [text](url) -> text
+    text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)
+    # 代码 `code` -> code
+    text = re.sub(r"`([^`]+)`", r"\1", text)
+    # 加粗/斜体/删除线
+    text = re.sub(r"\*\*([^*]+)\*\*", r"\1", text)
+    text = re.sub(r"__([^_]+)__", r"\1", text)
+    text = re.sub(r"\*([^*]+)\*", r"\1", text)
+    text = re.sub(r"_([^_]+)_", r"\1", text)
+    text = re.sub(r"~~([^~]+)~~", r"\1", text)
+    # 残余的 HTML 标签
+    text = re.sub(r"<[^>]+>", "", text)
+    return text.strip()
 
 
-def parse_editor_blocks(content_json: str | None) -> list[dict]:
-    if not content_json:
-        return []
-    try:
-        data = json.loads(content_json)
-    except (TypeError, ValueError):
-        return []
-    if isinstance(data, dict):
-        return data.get("blocks") or []
-    return []
+def _iter_lines_skip_code(md: str) -> Iterable[tuple[int, str]]:
+    """逐行迭代,跳过围栏代码块内容。"""
+    in_fence = False
+    fence_marker = ""
+    for idx, line in enumerate((md or "").splitlines(), 1):
+        m = _FENCE_RE.match(line.lstrip())
+        if m:
+            marker = m.group(1)
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+                continue
+            if marker == fence_marker:
+                in_fence = False
+                fence_marker = ""
+                continue
+        if in_fence:
+            continue
+        yield idx, line
 
 
 def extract_outline(content_json: str | None) -> list[dict]:
-    """Extract H1-H3 headers from Editor.js JSON.
-
-    Returns list of {level, text, anchor}.
-    """
-    outline = []
-    used = {}
-    for block in parse_editor_blocks(content_json):
-        if block.get("type") != "header":
+    """从 Markdown 提取 H1-H3 标题,生成 [{level, text, anchor}] 列表。"""
+    md = content_json or ""
+    if not md.strip():
+        return []
+    outline: list[dict] = []
+    used: dict[str, int] = {}
+    for _, line in _iter_lines_skip_code(md):
+        m = _HEADING_RE.match(line)
+        if not m:
             continue
-        data = block.get("data") or {}
-        level = int(data.get("level") or 2)
+        level = len(m.group(1))
         if level > 3:
             continue
-        text = _strip_html(data.get("text") or "")
-        if not text.strip():
+        text = _strip_inline_md(m.group(2))
+        if not text:
             continue
         base = _slugify_anchor(text)
         used[base] = used.get(base, 0) + 1
@@ -56,80 +91,52 @@ def extract_outline(content_json: str | None) -> list[dict]:
 
 
 def extract_plain_text(content_json: str | None) -> str:
-    """Convert Editor.js content to plain text for search / AI use."""
+    """从 Markdown 提取纯文本(供搜索/AI 使用)。"""
+    md = content_json or ""
+    if not md.strip():
+        return ""
     parts: list[str] = []
-    for block in parse_editor_blocks(content_json):
-        btype = block.get("type")
-        data = block.get("data") or {}
-        if btype in {"paragraph", "header", "quote"}:
-            parts.append(_strip_html(data.get("text") or ""))
-        elif btype == "list":
-            items = data.get("items") or []
-            for it in items:
-                if isinstance(it, str):
-                    parts.append("- " + _strip_html(it))
-                elif isinstance(it, dict):
-                    parts.append("- " + _strip_html(it.get("content") or it.get("text") or ""))
-        elif btype == "checklist":
-            for it in data.get("items") or []:
-                parts.append("- " + _strip_html(it.get("text") or ""))
-        elif btype == "code":
-            parts.append(data.get("code") or "")
-        elif btype == "table":
-            for row in data.get("content") or []:
-                parts.append(" | ".join(_strip_html(c) for c in row))
-        elif btype == "delimiter":
-            parts.append("---")
-        elif btype == "image":
-            cap = _strip_html(data.get("caption") or "")
-            if cap:
-                parts.append(cap)
-    return "\n".join(p for p in parts if p)
+    in_fence = False
+    fence_marker = ""
+    for line in md.splitlines():
+        stripped = line.lstrip()
+        m = _FENCE_RE.match(stripped)
+        if m:
+            marker = m.group(1)
+            if not in_fence:
+                in_fence = True
+                fence_marker = marker
+                continue
+            if marker == fence_marker:
+                in_fence = False
+                fence_marker = ""
+                continue
+        if in_fence:
+            parts.append(line)
+            continue
+        # 标题
+        h = _HEADING_RE.match(line)
+        if h:
+            parts.append(_strip_inline_md(h.group(2)))
+            continue
+        # 列表 / 引用 前缀去掉
+        body = re.sub(r"^\s*([>\-*+]|\d+\.)\s+", "", line)
+        # 任务列表 [x] / [ ]
+        body = re.sub(r"^\[[ xX]\]\s*", "", body)
+        # 表格分隔行(全是 - 和 | )去掉
+        if re.fullmatch(r"\s*\|?\s*[-:\s|]+\|?\s*", body) and "|" in line:
+            continue
+        # 表格内容: | a | b | -> a  b
+        if "|" in body and body.strip().startswith("|"):
+            cells = [c.strip() for c in body.strip().strip("|").split("|")]
+            body = "  ".join(_strip_inline_md(c) for c in cells if c)
+        else:
+            body = _strip_inline_md(body)
+        if body:
+            parts.append(body)
+    return "\n".join(parts).strip()
 
 
 def extract_markdown(content_json: str | None) -> str:
-    """Convert Editor.js content to a simple markdown representation."""
-    out: list[str] = []
-    for block in parse_editor_blocks(content_json):
-        btype = block.get("type")
-        data = block.get("data") or {}
-        if btype == "header":
-            level = int(data.get("level") or 2)
-            text = _strip_html(data.get("text") or "")
-            out.append("#" * max(1, min(level, 6)) + " " + text)
-        elif btype == "paragraph":
-            out.append(_strip_html(data.get("text") or ""))
-        elif btype == "quote":
-            text = _strip_html(data.get("text") or "")
-            out.append("> " + text.replace("\n", "\n> "))
-        elif btype == "list":
-            style = data.get("style") or "unordered"
-            items = data.get("items") or []
-            for idx, it in enumerate(items, 1):
-                content = it if isinstance(it, str) else (it.get("content") or it.get("text") or "")
-                content = _strip_html(content)
-                prefix = f"{idx}. " if style == "ordered" else "- "
-                out.append(prefix + content)
-        elif btype == "checklist":
-            for it in data.get("items") or []:
-                checked = "[x]" if it.get("checked") else "[ ]"
-                out.append(f"- {checked} " + _strip_html(it.get("text") or ""))
-        elif btype == "code":
-            out.append("```\n" + (data.get("code") or "") + "\n```")
-        elif btype == "table":
-            rows = data.get("content") or []
-            if rows:
-                header = rows[0]
-                out.append("| " + " | ".join(_strip_html(c) for c in header) + " |")
-                out.append("| " + " | ".join(["---"] * len(header)) + " |")
-                for row in rows[1:]:
-                    out.append("| " + " | ".join(_strip_html(c) for c in row) + " |")
-        elif btype == "delimiter":
-            out.append("---")
-        elif btype == "image":
-            url = (data.get("file") or {}).get("url") or data.get("url") or ""
-            cap = _strip_html(data.get("caption") or "")
-            if url:
-                out.append(f"![{cap}]({url})")
-        out.append("")
-    return "\n".join(out).strip()
+    """兼容旧调用:文档已经以 Markdown 存储,直接返回。"""
+    return (content_json or "").strip()

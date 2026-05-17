@@ -11,7 +11,7 @@ from ..services import kb_service, doc_service
 bp = Blueprint("kb", __name__)
 
 
-def _get_kb_or_404(kb_id: int) -> KnowledgeBase:
+def _get_kb_or_404(kb_id: str) -> KnowledgeBase:
     kb = db.session.get(KnowledgeBase, kb_id)
     if kb is None or kb.is_archived:
         abort(404)
@@ -53,7 +53,7 @@ def new_kb():
     return render_template("kb/new.html", form={})
 
 
-@bp.route("/<int:kb_id>")
+@bp.route("/<kb_id>")
 def detail(kb_id):
     kb = _get_kb_or_404(kb_id)
     if not kb_service.can_access(current_user, kb):
@@ -72,7 +72,7 @@ def detail(kb_id):
     )
 
 
-@bp.route("/<int:kb_id>/edit", methods=["GET", "POST"])
+@bp.route("/<kb_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_kb(kb_id):
     kb = _get_kb_or_404(kb_id)
@@ -91,7 +91,7 @@ def edit_kb(kb_id):
     return render_template("kb/edit.html", kb=kb)
 
 
-@bp.route("/<int:kb_id>/delete", methods=["POST"])
+@bp.route("/<kb_id>/delete", methods=["POST"])
 @login_required
 def delete_kb(kb_id):
     kb = _get_kb_or_404(kb_id)
@@ -103,7 +103,7 @@ def delete_kb(kb_id):
     return redirect(url_for("kb.list_kbs"))
 
 
-@bp.route("/<int:kb_id>/members", methods=["GET", "POST"])
+@bp.route("/<kb_id>/members", methods=["GET", "POST"])
 @login_required
 def members(kb_id):
     kb = _get_kb_or_404(kb_id)
@@ -129,7 +129,7 @@ def members(kb_id):
     return render_template("kb/members.html", kb=kb, members=members_)
 
 
-@bp.route("/<int:kb_id>/members/<int:user_id>/delete", methods=["POST"])
+@bp.route("/<kb_id>/members/<int:user_id>/delete", methods=["POST"])
 @login_required
 def remove_member(kb_id, user_id):
     kb = _get_kb_or_404(kb_id)

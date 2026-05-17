@@ -10,7 +10,7 @@ from ..utils.outline import extract_outline
 bp = Blueprint("doc", __name__)
 
 
-def _get_doc_or_404(doc_id: int) -> Document:
+def _get_doc_or_404(doc_id: str) -> Document:
     doc = db.session.get(Document, doc_id)
     if doc is None or doc.is_deleted:
         abort(404)
@@ -20,14 +20,15 @@ def _get_doc_or_404(doc_id: int) -> Document:
 @bp.route("/new", methods=["POST"])
 @login_required
 def new_doc():
-    kb_id = int(request.form.get("kb_id") or request.args.get("kb_id") or 0)
+    kb_id = (request.form.get("kb_id") or request.args.get("kb_id") or "").strip()
+    if not kb_id:
+        abort(404)
     kb = db.session.get(KnowledgeBase, kb_id)
     if not kb:
         abort(404)
     if not kb_service.can_edit(current_user, kb):
         abort(403)
-    parent_id = request.form.get("parent_id") or None
-    parent_id = int(parent_id) if parent_id and str(parent_id).isdigit() else None
+    parent_id = (request.form.get("parent_id") or "").strip() or None
     doc_type = request.form.get("type") or DocumentType.DOC.value
     if doc_type not in {t.value for t in DocumentType}:
         doc_type = DocumentType.DOC.value
@@ -40,7 +41,7 @@ def new_doc():
     return redirect(url_for("doc.edit", doc_id=doc.id))
 
 
-@bp.route("/<int:doc_id>")
+@bp.route("/<doc_id>")
 def view(doc_id):
     doc = _get_doc_or_404(doc_id)
     kb = doc.kb
@@ -55,7 +56,7 @@ def view(doc_id):
     )
 
 
-@bp.route("/<int:doc_id>/edit")
+@bp.route("/<doc_id>/edit")
 @login_required
 def edit(doc_id):
     doc = _get_doc_or_404(doc_id)
@@ -66,7 +67,7 @@ def edit(doc_id):
     return render_template("doc/edit.html", doc=doc, kb=kb, tree=tree)
 
 
-@bp.route("/<int:doc_id>/save", methods=["POST"])
+@bp.route("/<doc_id>/save", methods=["POST"])
 @login_required
 def save(doc_id):
     doc = _get_doc_or_404(doc_id)
@@ -84,7 +85,7 @@ def save(doc_id):
     return jsonify({"ok": True, "outline": outline, "updated_at": doc.updated_at.isoformat()})
 
 
-@bp.route("/<int:doc_id>/delete", methods=["POST"])
+@bp.route("/<doc_id>/delete", methods=["POST"])
 @login_required
 def delete(doc_id):
     doc = _get_doc_or_404(doc_id)
@@ -100,7 +101,7 @@ def delete(doc_id):
     return redirect(url_for("kb.detail", kb_id=kb.id))
 
 
-@bp.route("/<int:doc_id>/share", methods=["GET", "POST"])
+@bp.route("/<doc_id>/share", methods=["GET", "POST"])
 @login_required
 def share(doc_id):
     doc = _get_doc_or_404(doc_id)

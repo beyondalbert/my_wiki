@@ -8,14 +8,14 @@ from ..models import Document, KnowledgeBase, DocumentType, DocumentPrivacy
 from ..utils.outline import extract_plain_text
 
 
-def list_kb_doc_tree(kb_id: int) -> list[dict]:
+def list_kb_doc_tree(kb_id: str) -> list[dict]:
     """Return a nested list representation of all (non-deleted) docs in a KB."""
     docs = (
         Document.query.filter_by(kb_id=kb_id, is_deleted=False)
         .order_by(Document.parent_id.is_(None).desc(), Document.sort_order.asc(), Document.id.asc())
         .all()
     )
-    by_parent: dict[int | None, list[Document]] = {}
+    by_parent: dict[str | None, list[Document]] = {}
     for d in docs:
         by_parent.setdefault(d.parent_id, []).append(d)
 
@@ -34,7 +34,7 @@ def list_kb_doc_tree(kb_id: int) -> list[dict]:
     return build(None)
 
 
-def create_document(kb: KnowledgeBase, user, title: str = "未命名", parent_id: int | None = None,
+def create_document(kb: KnowledgeBase, user, title: str = "未命名", parent_id: str | None = None,
                     doc_type: str = DocumentType.DOC.value,
                     privacy: str = DocumentPrivacy.NORMAL.value) -> Document:
     doc = Document(
@@ -67,7 +67,7 @@ def soft_delete(doc: Document) -> None:
     db.session.commit()
 
 
-def collect_descendants(doc_id: int) -> list[int]:
+def collect_descendants(doc_id: str) -> list[str]:
     """Return all descendant doc ids including itself."""
     result = [doc_id]
     queue = [doc_id]

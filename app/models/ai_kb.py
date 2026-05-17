@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 from ..extensions import db
+from ..utils.ids import generate_id
 
 
 class AIKBStatus(str, Enum):
@@ -22,7 +23,7 @@ class AIKBSourceStatus(str, Enum):
 class AIKnowledgeBase(db.Model):
     __tablename__ = "ai_knowledge_bases"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     name = db.Column(db.String(128), nullable=False)
@@ -50,9 +51,9 @@ class AIKBSource(db.Model):
         db.UniqueConstraint("ai_kb_id", "doc_id", name="uq_aikb_doc"),
     )
 
-    id = db.Column(db.Integer, primary_key=True)
-    ai_kb_id = db.Column(db.Integer, db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
-    doc_id = db.Column(db.Integer, db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    ai_kb_id = db.Column(db.String(12), db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    doc_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
 
     status = db.Column(db.String(16), default=AIKBSourceStatus.PENDING.value, nullable=False, index=True)
     err_msg = db.Column(db.String(500), default="")
@@ -70,8 +71,8 @@ class AIKBArticle(db.Model):
         db.UniqueConstraint("ai_kb_id", "slug", name="uq_aikb_slug"),
     )
 
-    id = db.Column(db.Integer, primary_key=True)
-    ai_kb_id = db.Column(db.Integer, db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    ai_kb_id = db.Column(db.String(12), db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
 
     title = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), nullable=False, index=True)
@@ -94,11 +95,11 @@ class AIKBLink(db.Model):
     """条目之间的超链接（解析自 [[Title]] 占位）。"""
     __tablename__ = "ai_kb_links"
 
-    id = db.Column(db.Integer, primary_key=True)
-    ai_kb_id = db.Column(db.Integer, db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
-    from_article_id = db.Column(db.Integer, db.ForeignKey("ai_kb_articles.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    ai_kb_id = db.Column(db.String(12), db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    from_article_id = db.Column(db.String(12), db.ForeignKey("ai_kb_articles.id", ondelete="CASCADE"), nullable=False, index=True)
     # to_article_id 可为空 -> 红链（占位但未命中任何条目）
-    to_article_id = db.Column(db.Integer, db.ForeignKey("ai_kb_articles.id", ondelete="SET NULL"), index=True)
+    to_article_id = db.Column(db.String(12), db.ForeignKey("ai_kb_articles.id", ondelete="SET NULL"), index=True)
     anchor_text = db.Column(db.String(255), default="")
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -111,9 +112,9 @@ class AIKBChunk(db.Model):
     """可选：仅当 enable_rag=true 时使用，存切分元数据；向量本体存 ChromaDB。"""
     __tablename__ = "ai_kb_chunks"
 
-    id = db.Column(db.Integer, primary_key=True)
-    ai_kb_id = db.Column(db.Integer, db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
-    article_id = db.Column(db.Integer, db.ForeignKey("ai_kb_articles.id", ondelete="CASCADE"), nullable=False, index=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    ai_kb_id = db.Column(db.String(12), db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    article_id = db.Column(db.String(12), db.ForeignKey("ai_kb_articles.id", ondelete="CASCADE"), nullable=False, index=True)
     chunk_idx = db.Column(db.Integer, default=0, nullable=False)
     content = db.Column(db.Text)
     vector_id = db.Column(db.String(64), index=True)

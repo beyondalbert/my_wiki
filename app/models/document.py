@@ -5,6 +5,7 @@ from enum import Enum
 from werkzeug.security import generate_password_hash, check_password_hash
 
 from ..extensions import db
+from ..utils.ids import generate_id
 
 
 class DocumentType(str, Enum):
@@ -20,9 +21,9 @@ class DocumentPrivacy(str, Enum):
 class Document(db.Model):
     __tablename__ = "documents"
 
-    id = db.Column(db.Integer, primary_key=True)
-    kb_id = db.Column(db.Integer, db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
-    parent_id = db.Column(db.Integer, db.ForeignKey("documents.id", ondelete="SET NULL"), index=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
+    kb_id = db.Column(db.String(12), db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="SET NULL"), index=True)
 
     title = db.Column(db.String(255), nullable=False, default="未命名")
     type = db.Column(db.String(16), default=DocumentType.DOC.value, nullable=False)
@@ -57,7 +58,7 @@ class DocumentShare(db.Model):
     __tablename__ = "document_shares"
 
     id = db.Column(db.Integer, primary_key=True)
-    doc_id = db.Column(db.Integer, db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+    doc_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
     token = db.Column(db.String(64), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255))  # nullable: no password if NULL
     expires_at = db.Column(db.DateTime)

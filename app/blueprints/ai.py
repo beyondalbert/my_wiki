@@ -15,7 +15,7 @@ from ..utils.markdown import render_wiki_markdown
 bp = Blueprint("ai", __name__)
 
 
-def _get_ai_kb_or_404(ai_kb_id: int) -> AIKnowledgeBase:
+def _get_ai_kb_or_404(ai_kb_id: str) -> AIKnowledgeBase:
     ai_kb = db.session.get(AIKnowledgeBase, ai_kb_id)
     if ai_kb is None:
         abort(404)
@@ -54,7 +54,7 @@ def new_ai_kb():
     return redirect(url_for("ai.detail", ai_kb_id=ai_kb.id))
 
 
-@bp.route("/<int:ai_kb_id>")
+@bp.route("/<ai_kb_id>")
 @login_required
 def detail(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -64,7 +64,7 @@ def detail(ai_kb_id):
     return render_template("ai/detail.html", ai_kb=ai_kb, sources=sources, articles=articles, redlinks=redlinks)
 
 
-@bp.route("/<int:ai_kb_id>/edit", methods=["POST"])
+@bp.route("/<ai_kb_id>/edit", methods=["POST"])
 @login_required
 def edit_ai_kb(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -77,7 +77,7 @@ def edit_ai_kb(ai_kb_id):
     return redirect(url_for("ai.detail", ai_kb_id=ai_kb.id))
 
 
-@bp.route("/<int:ai_kb_id>/delete", methods=["POST"])
+@bp.route("/<ai_kb_id>/delete", methods=["POST"])
 @login_required
 def delete_ai_kb(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -89,7 +89,7 @@ def delete_ai_kb(ai_kb_id):
 
 # ---------- Sources ----------
 
-@bp.route("/<int:ai_kb_id>/sources")
+@bp.route("/<ai_kb_id>/sources")
 @login_required
 def sources(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -107,11 +107,11 @@ def sources(ai_kb_id):
                            available_docs=available_docs)
 
 
-@bp.route("/<int:ai_kb_id>/sources/add", methods=["POST"])
+@bp.route("/<ai_kb_id>/sources/add", methods=["POST"])
 @login_required
 def add_sources(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
-    doc_ids = [int(x) for x in request.form.getlist("doc_ids") if str(x).isdigit()]
+    doc_ids = [x.strip() for x in request.form.getlist("doc_ids") if x and x.strip()]
     added = 0
     for did in doc_ids:
         doc = db.session.get(Document, did)
@@ -128,7 +128,7 @@ def add_sources(ai_kb_id):
     return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
 
 
-@bp.route("/<int:ai_kb_id>/sources/<int:source_id>/remove", methods=["POST"])
+@bp.route("/<ai_kb_id>/sources/<source_id>/remove", methods=["POST"])
 @login_required
 def remove_source(ai_kb_id, source_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -142,7 +142,7 @@ def remove_source(ai_kb_id, source_id):
 
 # ---------- Build / Status ----------
 
-@bp.route("/<int:ai_kb_id>/build", methods=["POST"])
+@bp.route("/<ai_kb_id>/build", methods=["POST"])
 @login_required
 def build(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -158,7 +158,7 @@ def build(ai_kb_id):
     return redirect(url_for("ai.detail", ai_kb_id=ai_kb.id))
 
 
-@bp.route("/<int:ai_kb_id>/status")
+@bp.route("/<ai_kb_id>/status")
 @login_required
 def status(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -181,7 +181,7 @@ def _wiki_resolver(ai_kb_id):
     return ai_service.article_resolver(ai_kb_id)
 
 
-def _rewrite_wiki_links(html: str, ai_kb_id: int) -> str:
+def _rewrite_wiki_links(html: str, ai_kb_id) -> str:
     """Replace href="#WIKI:slug" -> actual URL."""
     import re
     pattern = re.compile(r'href="#WIKI:([^"\s]+)"')
@@ -193,7 +193,7 @@ def _rewrite_wiki_links(html: str, ai_kb_id: int) -> str:
     return pattern.sub(sub, html)
 
 
-@bp.route("/<int:ai_kb_id>/wiki")
+@bp.route("/<ai_kb_id>/wiki")
 @login_required
 def wiki_home(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -207,7 +207,7 @@ def wiki_home(ai_kb_id):
     return render_template("ai/wiki_home.html", ai_kb=ai_kb, articles=articles, tag_groups=tag_groups)
 
 
-@bp.route("/<int:ai_kb_id>/wiki/<slug>")
+@bp.route("/<ai_kb_id>/wiki/<slug>")
 @login_required
 def wiki_article(ai_kb_id, slug):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -238,7 +238,7 @@ def wiki_article(ai_kb_id, slug):
     )
 
 
-@bp.route("/<int:ai_kb_id>/wiki/<slug>/regenerate", methods=["POST"])
+@bp.route("/<ai_kb_id>/wiki/<slug>/regenerate", methods=["POST"])
 @login_required
 def regenerate_article(ai_kb_id, slug):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -250,7 +250,7 @@ def regenerate_article(ai_kb_id, slug):
     return redirect(url_for("ai.wiki_article", ai_kb_id=ai_kb.id, slug=slug))
 
 
-@bp.route("/<int:ai_kb_id>/graph")
+@bp.route("/<ai_kb_id>/graph")
 @login_required
 def graph(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
@@ -264,7 +264,7 @@ def graph(ai_kb_id):
 
 # ---------- Optional chat (RAG / plain) ----------
 
-@bp.route("/<int:ai_kb_id>/chat", methods=["GET", "POST"])
+@bp.route("/<ai_kb_id>/chat", methods=["GET", "POST"])
 @login_required
 def chat(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)

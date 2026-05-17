@@ -226,7 +226,7 @@ def public_kbs():
     return render_template("admin/public_kbs.html", pager=pager, q=q)
 
 
-@bp.route("/public-kbs/<int:kb_id>/unpublish", methods=["POST"])
+@bp.route("/public-kbs/<kb_id>/unpublish", methods=["POST"])
 def unpublish_kb(kb_id):
     kb = db.session.get(KnowledgeBase, kb_id)
     if not kb:
@@ -252,7 +252,7 @@ def public_docs():
     return render_template("admin/public_docs.html", pager=pager, q=q)
 
 
-@bp.route("/public-docs/<int:doc_id>/takedown", methods=["POST"])
+@bp.route("/public-docs/<doc_id>/takedown", methods=["POST"])
 def takedown_doc(doc_id):
     doc = db.session.get(Document, doc_id)
     if not doc:

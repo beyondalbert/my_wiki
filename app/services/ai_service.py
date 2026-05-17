@@ -161,7 +161,7 @@ def build_article_from_document(llm: LLMClient, doc: Document) -> WikiArticleDra
     )
 
 
-def _slug_for(title: str, ai_kb_id: int) -> str:
+def _slug_for(title: str, ai_kb_id: str) -> str:
     base = slugify(title or "untitled", lowercase=True, max_length=80) or "untitled"
     candidate = base
     n = 2
@@ -201,7 +201,7 @@ def _write_article_file(ai_kb: AIKnowledgeBase, article: AIKBArticle) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def upsert_article(ai_kb: AIKnowledgeBase, draft: WikiArticleDraft, source_doc_id: int) -> AIKBArticle:
+def upsert_article(ai_kb: AIKnowledgeBase, draft: WikiArticleDraft, source_doc_id: str) -> AIKBArticle:
     article = AIKBArticle.query.filter_by(ai_kb_id=ai_kb.id, title=draft.title).first()
     if article:
         article.summary = draft.summary
@@ -234,7 +234,7 @@ def upsert_article(ai_kb: AIKnowledgeBase, draft: WikiArticleDraft, source_doc_i
 # Wiki link resolver
 # ---------------------------------------------------------------------------
 
-def _build_alias_index(ai_kb_id: int) -> dict[str, AIKBArticle]:
+def _build_alias_index(ai_kb_id: str) -> dict[str, AIKBArticle]:
     index: dict[str, AIKBArticle] = {}
     for art in AIKBArticle.query.filter_by(ai_kb_id=ai_kb_id).all():
         index[art.title.lower()] = art
@@ -278,7 +278,7 @@ def resolve_links(ai_kb: AIKnowledgeBase) -> tuple[int, int]:
     return resolved, red
 
 
-def article_resolver(ai_kb_id: int):
+def article_resolver(ai_kb_id: str):
     """Return a callable mapping a wiki target -> article slug or None."""
     index = _build_alias_index(ai_kb_id)
 
@@ -310,7 +310,7 @@ def _process_one_source(llm: LLMClient, ai_kb: AIKnowledgeBase, src: AIKBSource)
     db.session.commit()
 
 
-def build_wiki_async(app, ai_kb_id: int, *, only_pending: bool = True) -> None:
+def build_wiki_async(app, ai_kb_id: str, *, only_pending: bool = True) -> None:
     """Run the full wiki build inside a background thread."""
 
     def _job():
@@ -344,7 +344,7 @@ def build_wiki_async(app, ai_kb_id: int, *, only_pending: bool = True) -> None:
     t.start()
 
 
-def regenerate_one_async(app, ai_kb_id: int, article_id: int) -> None:
+def regenerate_one_async(app, ai_kb_id: str, article_id: str) -> None:
     def _job():
         with app.app_context():
             ai_kb = db.session.get(AIKnowledgeBase, ai_kb_id)

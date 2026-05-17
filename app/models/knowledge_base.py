@@ -3,6 +3,7 @@ from datetime import datetime
 from enum import Enum
 
 from ..extensions import db
+from ..utils.ids import generate_id
 
 
 class KBVisibility(str, Enum):
@@ -19,7 +20,7 @@ class KBMemberRole(str, Enum):
 class KnowledgeBase(db.Model):
     __tablename__ = "knowledge_bases"
 
-    id = db.Column(db.Integer, primary_key=True)
+    id = db.Column(db.String(12), primary_key=True, default=generate_id)
     name = db.Column(db.String(128), nullable=False)
     description = db.Column(db.String(500), default="")
     cover = db.Column(db.String(255), default="")
@@ -49,7 +50,7 @@ class KBMember(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    kb_id = db.Column(db.Integer, db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
+    kb_id = db.Column(db.String(12), db.ForeignKey("knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     role = db.Column(db.String(16), default=KBMemberRole.VIEWER.value, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)

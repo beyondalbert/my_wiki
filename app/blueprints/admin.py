@@ -38,14 +38,15 @@ def index():
 
 @bp.route("/users")
 def users():
-    page, size = get_page_args()
+    page, size = get_page_args(default_size=50)
     q = (request.args.get("q") or "").strip()
     query = User.query
     if q:
         like = f"%{q}%"
         query = query.filter((User.username.ilike(like)) | (User.email.ilike(like)))
     pager = query.order_by(User.id.desc()).paginate(page=page, per_page=size, error_out=False)
-    return render_template("admin/users.html", pager=pager, q=q)
+    total = pager.total
+    return render_template("admin/users.html", pager=pager, q=q, total=total)
 
 
 @bp.route("/users/<int:user_id>/toggle-active", methods=["POST"])

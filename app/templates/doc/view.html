@@ -64,33 +64,39 @@
     </aside>
 
     <main class="{{ 'col-span-9 lg:col-span-10' if is_sheet else 'col-span-9 lg:col-span-7' }}">
-      <div class="bg-white border border-slate-200 rounded-xl p-8">
-        <div class="flex items-center justify-between gap-2 mb-3">
-          <div class="flex items-center gap-2 min-w-0">
-            <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
-            <span class="text-xs px-2 py-0.5 rounded-full shrink-0"
-                  style="{{ 'background-color:#ecfdf5; color:#047857;' if is_sheet else 'background-color:#eef2ff; color:#4338ca;' }}">
-              {{ '📊 表格' if is_sheet else '📄 文档' }}
-            </span>
-          </div>
-          <div class="flex gap-2 shrink-0">
-            {% if can_edit %}
-              <a href="{{ url_for('doc.edit', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">编辑</a>
-              {% if doc.can_be_shared %}
-                <a href="{{ url_for('doc.share', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">分享</a>
+      <div class="bg-white border border-slate-200 rounded-xl">
+        {# 标题栏 — sticky 固定在 navbar(h-14) 下方 #}
+        <div class="sticky top-14 z-10 bg-white px-8 pt-6 pb-3 rounded-t-xl border-b border-slate-100">
+          <div class="flex items-center justify-between gap-2">
+            <div class="flex items-center gap-2 min-w-0">
+              <h1 class="text-3xl font-bold text-slate-800 break-all">{{ doc.title }}</h1>
+              <span class="text-xs px-2 py-0.5 rounded-full shrink-0"
+                    style="{{ 'background-color:#ecfdf5; color:#047857;' if is_sheet else 'background-color:#eef2ff; color:#4338ca;' }}">
+                {{ '📊 表格' if is_sheet else '📄 文档' }}
+              </span>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              {% if can_edit %}
+                <a href="{{ url_for('doc.edit', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm bg-indigo-600 text-white rounded-lg hover:bg-indigo-500">编辑</a>
+                {% if doc.can_be_shared %}
+                  <a href="{{ url_for('doc.share', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">分享</a>
+                {% endif %}
               {% endif %}
-            {% endif %}
+            </div>
+          </div>
+          <div class="text-xs text-slate-400 mt-1">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}
+            {% if doc.privacy == 'private' %}· <span style="color:#e11d48;">🔒 私密</span>{% endif %}
           </div>
         </div>
-        <div class="text-xs text-slate-400 mb-6">最后更新：{{ doc.updated_at.strftime('%Y-%m-%d %H:%M') }}
-          {% if doc.privacy == 'private' %}· <span style="color:#e11d48;">🔒 私密</span>{% endif %}
+        {# 正文内容区 #}
+        <div class="px-8 pb-8 pt-4">
+          {% if is_sheet %}
+            <div id="sheet-viewer" class="border border-slate-200 rounded overflow-auto" style="min-height:600px;"></div>
+          {% else %}
+            <div id="viewer"></div>
+          {% endif %}
+          <p id="empty-tip" class="hidden text-slate-400">暂无内容{% if can_edit %}，<a class="text-indigo-600 hover:underline" href="{{ url_for('doc.edit', doc_id=doc.id) }}">点此开始编辑</a>{% endif %}。</p>
         </div>
-        {% if is_sheet %}
-          <div id="sheet-viewer" class="border border-slate-200 rounded overflow-auto" style="min-height:600px;"></div>
-        {% else %}
-          <div id="viewer"></div>
-        {% endif %}
-        <p id="empty-tip" class="hidden text-slate-400">暂无内容{% if can_edit %}，<a class="text-indigo-600 hover:underline" href="{{ url_for('doc.edit', doc_id=doc.id) }}">点此开始编辑</a>{% endif %}。</p>
       </div>
     </main>
 

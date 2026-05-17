@@ -18,15 +18,79 @@
 - [app/templates/doc/edit.html](file://app/templates/doc/edit.html)
 - [app/templates/doc/view.html](file://app/templates/doc/view.html)
 - [scripts/fetch_vendors.py](file://scripts/fetch_vendors.py)
+- [scripts/init_db.py](file://scripts/init_db.py)
+- [scripts/reset_db.py](file://scripts/reset_db.py)
+- [app/cli.py](file://app/cli.py)
+- [app/extensions.py](file://app/extensions.py)
+- [app/utils/ids.py](file://app/utils/ids.py)
+- [app/utils/pagination.py](file://app/utils/pagination.py)
+- [app/utils/decorators.py](file://app/utils/decorators.py)
+- [app/utils/captcha_service.py](file://app/utils/captcha_service.py)
+- [app/utils/outline.py](file://app/utils/outline.py)
+- [app/utils/markdown.py](file://app/utils/markdown.py)
+- [app/utils/security.py](file://app/utils/security.py)
+- [app/blueprints/admin.py](file://app/blueprints/admin.py)
+- [app/blueprints/ai.py](file://app/blueprints/ai.py)
+- [app/blueprints/auth.py](file://app/blueprints/auth.py)
+- [app/blueprints/kb.py](file://app/blueprints/kb.py)
+- [app/blueprints/main.py](file://app/blueprints/main.py)
+- [app/blueprints/share.py](file://app/blueprints/share.py)
+- [app/blueprints/user.py](file://app/blueprints/user.py)
+- [app/models/user.py](file://app/models/user.py)
+- [app/models/ai_kb.py](file://app/models/ai_kb.py)
+- [app/models/knowledge_base.py](file://app/models/knowledge_base.py)
+- [app/services/auth_service.py](file://app/services/auth_service.py)
+- [app/services/ai_service.py](file://app/services/ai_service.py)
+- [app/services/captcha_service.py](file://app/services/captcha_service.py)
+- [app/services/kb_service.py](file://app/services/kb_service.py)
+- [app/services/share_service.py](file://app/services/share_service.py)
+- [app/templates/admin/admins.html](file://app/templates/admin/admins.html)
+- [app/templates/admin/index.html](file://app/templates/admin/index.html)
+- [app/templates/admin/public_docs.html](file://app/templates/admin/public_docs.html)
+- [app/templates/admin/public_kbs.html](file://app/templates/admin/public_kbs.html)
+- [app/templates/admin/roles.html](file://app/templates/admin/roles.html)
+- [app/templates/admin/users.html](file://app/templates/admin/users.html)
+- [app/templates/ai/chat.html](file://app/templates/ai/chat.html)
+- [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
+- [app/templates/ai/graph.html](file://app/templates/ai/graph.html)
+- [app/templates/ai/index.html](file://app/templates/ai/index.html)
+- [app/templates/ai/new.html](file://app/templates/ai/new.html)
+- [app/templates/ai/sources.html](file://app/templates/ai/sources.html)
+- [app/templates/ai/wiki_article.html](file://app/templates/ai/wiki_article.html)
+- [app/templates/ai/wiki_home.html](file://app/templates/ai/wiki_home.html)
+- [app/templates/auth/login.html](file://app/templates/auth/login.html)
+- [app/templates/auth/register.html](file://app/templates/auth/register.html)
+- [app/templates/components/footer.html](file://app/templates/components/footer.html)
+- [app/templates/components/navbar.html](file://app/templates/components/navbar.html)
+- [app/templates/errors/403.html](file://app/templates/errors/403.html)
+- [app/templates/errors/404.html](file://app/templates/errors/404.html)
+- [app/templates/errors/500.html](file://app/templates/errors/500.html)
+- [app/templates/kb/detail.html](file://app/templates/kb/detail.html)
+- [app/templates/kb/edit.html](file://app/templates/kb/edit.html)
+- [app/templates/kb/list.html](file://app/templates/kb/list.html)
+- [app/templates/kb/members.html](file://app/templates/kb/members.html)
+- [app/templates/kb/new.html](file://app/templates/kb/new.html)
+- [app/templates/kb/unlock.html](file://app/templates/kb/unlock.html)
+- [app/templates/main/landing.html](file://app/templates/main/landing.html)
+- [app/templates/share/invalid.html](file://app/templates/share/invalid.html)
+- [app/templates/share/password.html](file://app/templates/share/password.html)
+- [app/templates/share/view.html](file://app/templates/share/view.html)
+- [app/templates/user/dashboard.html](file://app/templates/user/dashboard.html)
+- [app/templates/user/profile.html](file://app/templates/user/profile.html)
+- [app/templates/base.html](file://app/templates/base.html)
+- [app/static/css/app.css](file://app/static/css/app.css)
+- [app/static/js/app.js](file://app/static/js/app.js)
 </cite>
 
 ## 更新摘要
 **所做更改**
 - 更新了编辑器实现部分，反映从Editor.js到Toast UI Editor的完全替换
+- 新增了图片上传集成功能，支持编辑器图片上传和存储
 - 更新了内容存储格式，从Editor.js JSON迁移到Markdown格式
 - 新增了JavaScript初始化代码和错误处理机制的详细说明
 - 更新了文档树结构管理和内容处理流程
 - 增强了前端编辑器集成和后端内容存储的说明
+- 新增了中文本地化支持和国际化配置
 
 ## 目录
 1. [简介](#简介)
@@ -51,6 +115,8 @@
 - **内容安全过滤**：内置 HTML 和 Markdown 内容安全机制
 - **版本控制与发布**：完整的文档生命周期管理
 - **分享与权限控制**：细粒度的访问权限和分享管理
+- **图片上传集成**：支持编辑器内图片上传和存储
+- **中文本地化支持**：完整的中文界面和编辑器本地化
 
 ## 项目结构
 
@@ -64,27 +130,33 @@ A --> C[models/]
 A --> D[services/]
 A --> E[utils/]
 A --> F[templates/]
+A --> G[static/]
 end
 subgraph "蓝图模块"
-B --> G[doc.py - 文档管理]
-B --> H[kb.py - 知识库管理]
-B --> I[auth.py - 认证]
-B --> J[share.py - 分享]
+B --> H[doc.py - 文档管理]
+B --> I[kb.py - 知识库管理]
+B --> J[auth.py - 认证]
+B --> K[share.py - 分享]
 end
 subgraph "核心模型"
-C --> K[document.py - 文档模型]
-C --> L[knowledge_base.py - 知识库模型]
-C --> M[user.py - 用户模型]
+C --> L[document.py - 文档模型]
+C --> M[knowledge_base.py - 知识库模型]
+C --> N[user.py - 用户模型]
 end
 subgraph "服务层"
-D --> N[doc_service.py - 文档服务]
-D --> O[kb_service.py - 知识库服务]
-D --> P[share_service.py - 分享服务]
+D --> O[doc_service.py - 文档服务]
+D --> P[kb_service.py - 知识库服务]
+D --> Q[share_service.py - 分享服务]
 end
 subgraph "工具模块"
-E --> Q[outline.py - 大纲提取]
-E --> R[markdown.py - Markdown处理]
-E --> S[security.py - 安全工具]
+E --> R[outline.py - 大纲提取]
+E --> S[markdown.py - Markdown处理]
+E --> T[security.py - 安全工具]
+end
+subgraph "静态资源"
+G --> U[vendor/ - 第三方库]
+G --> V[css/ - 样式文件]
+G --> W[js/ - JavaScript文件]
 end
 ```
 
@@ -169,13 +241,13 @@ flowchart TD
 A[Toast UI Editor 初始化] --> B[获取Markdown内容]
 B --> C{内容类型判断}
 C --> |Markdown| D[直接存储Markdown]
-C --> |编辑器事件| E[实时状态更新]
+C --> |表格| E[JSON数据存储]
 D --> F[生成大纲]
 D --> G[生成纯文本索引]
-E --> H[保存状态提示]
+E --> H[表格数据处理]
 F --> I[大纲输出]
 G --> J[搜索索引]
-H --> K[用户反馈]
+H --> K[表格渲染]
 ```
 
 **图表来源**
@@ -199,36 +271,38 @@ A[Web界面]
 B[Toast UI Editor]
 C[Markdown渲染器]
 D[错误处理机制]
+E[图片上传处理]
 end
 subgraph "应用层"
-E[Flask应用工厂]
-F[蓝图路由]
-G[会话管理]
+F[Flask应用工厂]
+G[蓝图路由]
+H[会话管理]
 end
 subgraph "服务层"
-H[文档服务]
-I[知识库服务]
-J[分享服务]
-K[安全服务]
+I[文档服务]
+J[知识库服务]
+K[分享服务]
+L[安全服务]
 end
 subgraph "数据层"
-L[SQLAlchemy ORM]
-M[MySQL数据库]
-N[文件存储]
+M[SQLAlchemy ORM]
+N[MySQL数据库]
+O[文件存储]
 end
-A --> E
-B --> H
-C --> K
-D --> E
-E --> F
-F --> H
-H --> I
-H --> J
-I --> L
-J --> L
-K --> L
+A --> F
+B --> I
+C --> L
+D --> F
+E --> I
+F --> G
+G --> I
+I --> J
+I --> K
+J --> M
+K --> M
 L --> M
-L --> N
+M --> N
+M --> O
 ```
 
 **图表来源**
@@ -260,6 +334,11 @@ S->>DB : 更新Markdown内容和元数据
 DB-->>S : 确认更新
 S-->>B : 返回成功响应
 B-->>U : JSON响应包含大纲和时间戳
+U->>A : POST /upload-image
+A->>B : upload_image()
+B->>DB : 保存图片文件
+DB-->>B : 返回图片URL
+B-->>U : JSON响应包含图片URL
 ```
 
 **图表来源**
@@ -338,6 +417,52 @@ H[Bleach过滤器] --> D
 **章节来源**
 - [app/utils/outline.py:34-55](file://app/utils/outline.py#L34-L55)
 - [app/utils/markdown.py:31-39](file://app/utils/markdown.py#L31-L39)
+
+### 图片上传处理
+
+#### 图片上传集成
+
+**新增** 系统现在支持编辑器内的图片上传功能：
+
+```mermaid
+flowchart TD
+A[编辑器图片上传] --> B{addImageBlobHook触发}
+B --> C[创建FormData]
+C --> D[POST到/upload-image]
+D --> E{文件验证}
+E --> |有效| F[保存到UPLOAD_DIR/images/]
+E --> |无效| G[返回错误信息]
+F --> H[生成安全文件名]
+H --> I[返回图片URL]
+I --> J[回调插入图片]
+G --> K[显示错误提示]
+```
+
+**图表来源**
+- [app/blueprints/doc.py:28-44](file://app/blueprints/doc.py#L28-L44)
+- [app/templates/doc/edit.html:129-146](file://app/templates/doc/edit.html#L129-L146)
+
+#### 图片上传配置
+
+系统提供了灵活的图片上传配置：
+
+```mermaid
+flowchart TD
+A[图片上传请求] --> B{检查文件类型}
+B --> |PNG/JPG/GIF/WEBP/SVG| C[生成唯一文件名]
+B --> |其他| D[返回格式错误]
+C --> E[创建上传目录]
+E --> F[保存文件到images/]
+F --> G[返回JSON包含URL]
+D --> H[返回400错误]
+```
+
+**图表来源**
+- [app/blueprints/doc.py:25-44](file://app/blueprints/doc.py#L25-L44)
+
+**章节来源**
+- [app/blueprints/doc.py:25-54](file://app/blueprints/doc.py#L25-L54)
+- [app/config.py:33-42](file://app/config.py#L33-L42)
 
 ### 文档树结构管理
 
@@ -436,37 +561,6 @@ I --> J[删除完成]
 - [app/blueprints/doc.py:87-100](file://app/blueprints/doc.py#L87-L100)
 - [app/services/doc_service.py:65-67](file://app/services/doc_service.py#L65-L67)
 
-### 文件上传处理
-
-#### 上传配置与限制
-
-系统提供了灵活的文件上传配置，支持自定义上传目录和大小限制：
-
-```mermaid
-flowchart TD
-A[上传请求] --> B{检查文件大小}
-B --> |超出限制| C[返回错误]
-B --> |符合要求| D[验证文件类型]
-D --> |类型不支持| E[返回错误]
-D --> |类型支持| F[生成唯一文件名]
-F --> G[保存到上传目录]
-G --> H[更新数据库记录]
-H --> I[返回上传成功]
-C --> J[结束]
-E --> J
-I --> J
-```
-
-**图表来源**
-- [app/config.py:33-35](file://app/config.py#L33-L35)
-
-#### 安全存储策略
-
-系统采用安全的文件命名策略，防止路径遍历攻击和文件覆盖问题。
-
-**章节来源**
-- [app/config.py:33-42](file://app/config.py#L33-L42)
-
 ### 内容安全过滤
 
 #### HTML安全机制
@@ -549,6 +643,7 @@ H[app/utils/markdown.py] --> I[app/utils/security.py]
 H --> J[第三方库]
 K[app/templates/doc/edit.html] --> L[app/static/vendor/js/toastui-editor-all.min.js]
 M[app/templates/doc/view.html] --> L
+N[app/templates/doc/edit.html] --> O[app/static/vendor/js/toastui-editor-i18n-zh-cn.js]
 ```
 
 **图表来源**
@@ -642,12 +737,30 @@ M[app/templates/doc/view.html] --> L
 1. **Toast UI Editor 资源加载失败**
 2. **JavaScript初始化错误**
 3. **浏览器兼容性问题**
+4. **中文本地化文件加载失败**
 
 **解决步骤**：
 1. **检查网络面板**：确认 toastui-editor-all.min.js 返回 200 OK
 2. **验证初始化代码**：检查编辑器初始化参数
 3. **测试浏览器兼容性**：确认支持现代浏览器
 4. **查看控制台错误**：定位具体的JavaScript错误
+5. **检查本地化文件**：确认 toastui-editor-i18n-zh-cn.js 正常加载
+
+#### **图片上传失败**
+
+**新增** **症状**：编辑器内图片上传失败
+
+**可能原因**：
+1. **上传目录权限问题**
+2. **文件类型不支持**
+3. **网络连接问题**
+4. **文件大小超限**
+
+**解决步骤**：
+1. **检查上传目录**：确认 UPLOAD_DIR/images/ 可写
+2. **验证文件类型**：确认 PNG/JPG/GIF/WEBP/SVG 格式
+3. **检查网络连接**：确认 /upload-image 接口可用
+4. **验证文件大小**：确认不超过 MAX_CONTENT_LENGTH 限制
 
 **章节来源**
 - [app/blueprints/doc.py:13-17](file://app/blueprints/doc.py#L13-L17)
@@ -663,15 +776,18 @@ A[异常发生] --> B{异常类型判断}
 B --> |404| C[文档不存在]
 B --> |403| D[权限不足]
 B --> |编辑器错误| E[Toast UI Editor错误]
-B --> |其他| F[服务器错误]
-C --> G[返回404页面]
-D --> H[返回403页面]
-E --> I[显示错误提示]
-F --> J[返回500页面]
-G --> K[日志记录]
-H --> K
-I --> K
-J --> K
+B --> |图片上传错误| F[文件上传失败]
+B --> |其他| G[服务器错误]
+C --> H[返回404页面]
+D --> I[返回403页面]
+E --> J[显示错误提示]
+F --> K[显示上传失败]
+G --> L[返回500页面]
+H --> M[日志记录]
+I --> M
+J --> M
+K --> M
+L --> M
 ```
 
 **图表来源**
@@ -689,6 +805,8 @@ J --> K
 3. **性能优化**：合理的数据库设计和查询优化
 4. **用户体验**：直观的编辑器和流畅的操作体验
 5. **现代化技术栈**：采用 Toast UI Editor 提供更好的编辑体验
+6. **功能丰富**：支持图片上传、中文本地化、智能大纲等功能
+7. **开发友好**：完善的错误处理和调试支持
 
 ### 发展建议
 
@@ -697,5 +815,6 @@ J --> K
 3. **版本历史**：实现更精细的版本控制和比较功能
 4. **移动端适配**：优化移动端用户体验
 5. **编辑器功能扩展**：利用 Toast UI Editor 的更多特性
+6. **AI集成增强**：结合 Markdown 提取的纯文本进行更智能的AI处理
 
 该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。

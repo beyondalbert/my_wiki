@@ -123,6 +123,12 @@
 {% else %}
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
   <script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+  <style>
+    /* 大纲点击滚动时，补偿 sticky navbar 高度，避免 heading 被遮挡 */
+    #viewer h1, #viewer h2, #viewer h3, #viewer h4, #viewer h5, #viewer h6 {
+      scroll-margin-top: 5.5rem;
+    }
+  </style>
 {% endif %}
 {% endblock %}
 
@@ -131,6 +137,7 @@
 (function () {
   const IS_SHEET = {{ 'true' if is_sheet else 'false' }};
   const raw = {{ (doc.content_json or "")|tojson }};
+  const OUTLINE = {{ outline|tojson }};
   const empty = !raw || !raw.trim();
 
   if (IS_SHEET) {
@@ -159,6 +166,38 @@
       viewer: true,
       initialValue: raw,
       usageStatistics: false,
+    });
+
+    // Viewer 渲染后：按 outline 顺序给 H1/H2/H3 打上后端生成的 anchor id，
+    // 以便右侧大纲 <a href="#anchor"> 可以准确跳转。
+    requestAnimationFrame(function () {
+      const headings = target.querySelectorAll('h1, h2, h3');
+      // outline 与 headings 应一一对应（同一顺序从 markdown 提取）
+      const len = Math.min(headings.length, OUTLINE.length);
+      for (let i = 0; i < len; i++) {
+        if (OUTLINE[i] && OUTLINE[i].anchor && !headings[i].id) {
+          headings[i].id = OUTLINE[i].anchor;
+        }
+      }
+
+      // 点击大纲平滑滚动（避免默认 hash 跳转被 navbar 遮住）
+      document.querySelectorAll('aside .outline a[href^="#"]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+          const id = decodeURIComponent(a.getAttribute('href').slice(1));
+          const el = document.getElementById(id);
+          if (!el) return;
+          e.preventDefault();
+          el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          history.replaceState(null, '', '#' + id);
+        });
+      });
+
+      // 首次加载带 hash 时，viewer 还未渲染完会定位失败 → 此时重试一次
+      if (location.hash && location.hash.length > 1) {
+        const id = decodeURIComponent(location.hash.slice(1));
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'auto', block: 'start' });
+      }
     });
   }
 })();

@@ -7,7 +7,7 @@
       <h1 class="text-2xl font-bold text-slate-800">AI 知识库</h1>
       <p class="text-slate-500 text-sm mt-1">参考 Karpathy LLM Wiki · 纯 Markdown 双向超链接</p>
     </div>
-    <a href="{{ url_for('ai.new') }}" class="px-3 py-2 rounded-lg bg-violet-600 text-white text-sm hover:bg-violet-500">+ 新建 AI 知识库</a>
+    <a href="{{ url_for('ai.new_ai_kb') }}" class="px-3 py-2 rounded-lg bg-indigo-600 text-white text-sm hover:bg-indigo-500">+ 新建 AI 知识库</a>
   </div>
   {% if items %}
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -30,7 +30,7 @@
     </div>
   {% else %}
     <div class="text-center py-16 text-slate-500 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-      还没有 AI 知识库，<a class="text-violet-600 hover:underline" href="{{ url_for('ai.new') }}">创建一个</a>
+      还没有 AI 知识库，<a class="text-indigo-600 hover:underline" href="{{ url_for('ai.new_ai_kb') }}">创建一个</a>
     </div>
   {% endif %}
 </div>

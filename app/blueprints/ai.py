@@ -31,14 +31,16 @@ def index():
     return render_template("ai/index.html", items=items)
 
 
-@bp.route("/new", methods=["POST"])
+@bp.route("/new", methods=["GET", "POST"])
 @login_required
 def new_ai_kb():
+    if request.method == "GET":
+        return render_template("ai/new.html")
     name = (request.form.get("name") or "").strip()
     description = (request.form.get("description") or "").strip()
     if not name:
         flash("请输入名称", "error")
-        return redirect(url_for("ai.index"))
+        return redirect(url_for("ai.new_ai_kb"))
     ai_kb = AIKnowledgeBase(
         owner_id=current_user.id,
         name=name,

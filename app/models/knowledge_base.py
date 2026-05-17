@@ -2,6 +2,8 @@
 from datetime import datetime
 from enum import Enum
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
 from ..extensions import db
 from ..utils.ids import generate_id
 
@@ -28,6 +30,8 @@ class KnowledgeBase(db.Model):
 
     owner_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     visibility = db.Column(db.String(16), default=KBVisibility.PRIVATE.value, nullable=False, index=True)
+    # 仅在 visibility=public 时生效：设置后访客需输入密码才能访问。NULL = 不设密码。
+    access_password_hash = db.Column(db.String(255))
 
     is_archived = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -38,6 +42,21 @@ class KnowledgeBase(db.Model):
     @property
     def is_public(self) -> bool:
         return self.visibility == KBVisibility.PUBLIC.value
+
+    @property
+    def has_access_password(self) -> bool:
+        return bool(self.access_password_hash)
+
+    def set_access_password(self, password: str | None) -> None:
+        if not password:
+            self.access_password_hash = None
+        else:
+            self.access_password_hash = generate_password_hash(password)
+
+    def check_access_password(self, password: str) -> bool:
+        if not self.access_password_hash:
+            return True
+        return check_password_hash(self.access_password_hash, password or "")
 
     def __repr__(self) -> str:
         return f"<KnowledgeBase {self.id} {self.name}>"

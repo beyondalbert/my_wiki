@@ -1,4 +1,4 @@
-# AI知识库蓝图 (AI Knowledge Base Blueprint)
+# AI知识库蓝图（AI知识库蓝图）
 
 <cite>
 **本文引用的文件**
@@ -13,9 +13,22 @@
 - [app/utils/markdown.py](file://app/utils/markdown.py)
 - [app/utils/outline.py](file://app/utils/outline.py)
 - [app/blueprints/kb.py](file://app/blueprints/kb.py)
+- [app/blueprints/doc.py](file://app/blueprints/doc.py)
+- [app/blueprints/admin.py](file://app/blueprints/admin.py)
+- [app/blueprints/user.py](file://app/blueprints/user.py)
+- [app/blueprints/share.py](file://app/blueprints/share.py)
 - [scripts/init_db.py](file://scripts/init_db.py)
 - [app/templates/base.html](file://app/templates/base.html)
+- [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
+- [app/templates/ai/wiki_home.html](file://app/templates/ai/wiki_home.html)
+- [app/templates/ai/wiki_article.html](file://app/templates/ai/wiki_article.html)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了AI知识库蓝图路由文档，反映路由参数从<int:id>到<id>的变更
+- 修正了API使用示例中的路由参数格式
+- 更新了相关模板文件的引用
 
 ## 目录
 1. [简介](#简介)
@@ -30,7 +43,7 @@
 10. [附录](#附录)
 
 ## 简介
-本项目是一个基于 Flask 的“AI知识库蓝图”，实现了受 Andrej Karpathy 的 LLM Wiki 方法启发的知识库构建流水线：从知识库中的文档出发，通过大模型将每个源文档改写为结构化的维基条目，建立双向链接图谱，支持纯文本检索问答与可选的向量化增强问答（RAG）。系统通过 OpenAI 兼容接口调用大模型，采用异步后台任务完成构建，前端提供知识库管理、条目浏览、链接图谱与聊天问答等功能。
+本项目是一个基于 Flask 的"AI知识库蓝图"，实现了受 Andrej Karpathy 的 LLM Wiki 方法启发的知识库构建流水线：从知识库中的文档出发，通过大模型将每个源文档改写为结构化的维基条目，建立双向链接图谱，支持纯文本检索问答与可选的向量化增强问答（RAG）。系统通过 OpenAI 兼容接口调用大模型，采用异步后台任务完成构建，前端提供知识库管理、条目浏览、链接图谱与聊天问答等功能。
 
 ## 项目结构
 项目采用典型的 Flask 分层组织方式：蓝图负责路由与视图，服务层封装业务逻辑，模型层定义数据库实体，工具模块提供 Markdown 解析与编辑器内容转换，配置模块集中管理运行参数，入口脚本负责应用工厂与开发服务器启动。
@@ -45,6 +58,8 @@ end
 subgraph "蓝图层"
 AI_BP["app/blueprints/ai.py<br/>AI知识库蓝图"]
 KB_BP["app/blueprints/kb.py<br/>知识库蓝图"]
+DOC_BP["app/blueprints/doc.py<br/>文档蓝图"]
+ADMIN_BP["app/blueprints/admin.py<br/>管理蓝图"]
 end
 subgraph "服务层"
 AI_SRV["app/services/ai_service.py<br/>AI服务"]
@@ -60,6 +75,8 @@ RUN --> APP
 APP --> CFG
 APP --> AI_BP
 APP --> KB_BP
+APP --> DOC_BP
+APP --> ADMIN_BP
 AI_BP --> AI_SRV
 AI_SRV --> MODELS
 AI_SRV --> MD
@@ -72,6 +89,8 @@ AI_SRV --> OUTLINE
 - [app/config.py:15-54](file://app/config.py#L15-L54)
 - [app/blueprints/ai.py:15](file://app/blueprints/ai.py#L15)
 - [app/blueprints/kb.py:11](file://app/blueprints/kb.py#L11)
+- [app/blueprints/doc.py:10](file://app/blueprints/doc.py#L10)
+- [app/blueprints/admin.py:12](file://app/blueprints/admin.py#L12)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
 - [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
@@ -86,6 +105,8 @@ AI_SRV --> OUTLINE
 - 蓝图与路由
   - AI知识库蓝图：提供知识库创建、编辑、删除、源文档管理、构建状态查询、维基浏览、链接图谱与聊天问答接口。
   - 知识库蓝图：提供知识库列表、详情、成员管理等传统知识库功能。
+  - 文档蓝图：提供文档的创建、查看、编辑、删除与分享功能。
+  - 管理蓝图：提供系统管理功能，包括用户管理、角色权限管理等。
 - 服务层
   - AI服务：封装 LLM 客户端、维基条目构建、链接解析、异步构建与重生成、可选 RAG 聊天。
 - 模型层
@@ -95,7 +116,10 @@ AI_SRV --> OUTLINE
   - 编辑器内容到纯文本与 Markdown 的转换。
 
 **章节来源**
-- [app/blueprints/ai.py:15-279](file://app/blueprints/ai.py#L15-L279)
+- [app/blueprints/ai.py:15-281](file://app/blueprints/ai.py#L15-L281)
+- [app/blueprints/kb.py:14-171](file://app/blueprints/kb.py#L14-L171)
+- [app/blueprints/doc.py:13-142](file://app/blueprints/doc.py#L13-L142)
+- [app/blueprints/admin.py:15-264](file://app/blueprints/admin.py#L15-L264)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
 - [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
@@ -127,7 +151,7 @@ MODELS --> DB
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:15-279](file://app/blueprints/ai.py#L15-L279)
+- [app/blueprints/ai.py:15-281](file://app/blueprints/ai.py#L15-L281)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
 - [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
@@ -156,7 +180,7 @@ participant SVC as "AI服务"
 participant LLM as "LLM客户端"
 participant DB as "数据库"
 participant FS as "文件系统"
-U->>BP : "POST /ai/<id>/build"
+U->>BP : "POST /ai/<ai_kb_id>/build"
 BP->>SVC : "build_wiki_async(ai_kb_id)"
 SVC->>DB : "更新知识库状态为BUILDING"
 loop 遍历源文档
@@ -171,19 +195,19 @@ SVC->>DB : "更新状态为READY/FAILED"
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
+- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 
 **章节来源**
-- [app/blueprints/ai.py:27-85](file://app/blueprints/ai.py#L27-L85)
-- [app/blueprints/ai.py:90-138](file://app/blueprints/ai.py#L90-L138)
-- [app/blueprints/ai.py:143-173](file://app/blueprints/ai.py#L143-L173)
-- [app/blueprints/ai.py:194-236](file://app/blueprints/ai.py#L194-L236)
-- [app/blueprints/ai.py:251-260](file://app/blueprints/ai.py#L251-L260)
-- [app/blueprints/ai.py:265-278](file://app/blueprints/ai.py#L265-L278)
+- [app/blueprints/ai.py:27-87](file://app/blueprints/ai.py#L27-L87)
+- [app/blueprints/ai.py:92-141](file://app/blueprints/ai.py#L92-L141)
+- [app/blueprints/ai.py:145-175](file://app/blueprints/ai.py#L145-L175)
+- [app/blueprints/ai.py:196-250](file://app/blueprints/ai.py#L196-L250)
+- [app/blueprints/ai.py:253-262](file://app/blueprints/ai.py#L253-L262)
+- [app/blueprints/ai.py:267-280](file://app/blueprints/ai.py#L267-L280)
 
 ### 组件B：AI服务与LLM客户端
 - LLM 客户端
@@ -282,7 +306,15 @@ NEXT --> END(["输出纯文本/Markdown"])
 - 与 AI 蓝图协同：AI 知识库的源文档来自知识库内的文档集合。
 
 **章节来源**
-- [app/blueprints/kb.py:14-141](file://app/blueprints/kb.py#L14-L141)
+- [app/blueprints/kb.py:14-171](file://app/blueprints/kb.py#L14-L171)
+
+### 组件E：文档蓝图与分享功能
+- 文档管理：提供文档的创建、查看、编辑、删除功能。
+- 分享功能：支持文档分享链接的创建、管理和撤销。
+
+**章节来源**
+- [app/blueprints/doc.py:13-142](file://app/blueprints/doc.py#L13-L142)
+- [app/blueprints/share.py:14-41](file://app/blueprints/share.py#L14-L41)
 
 ## 依赖分析
 - 运行时依赖
@@ -331,8 +363,6 @@ REQ -.-> OPT
   - 限制上下文长度：聊天时对条目内容进行截断，控制 token 消耗。
   - 可选 RAG：默认关闭，避免额外向量计算与存储开销。
 
-[本节为通用性能建议，不直接分析具体文件，故无章节来源]
-
 ## 故障排查指南
 - 常见错误与定位
   - LLM SDK 未安装：初始化 LLM 客户端时导入异常，检查依赖安装。
@@ -353,12 +383,10 @@ REQ -.-> OPT
 - [app/services/ai_service.py:300-310](file://app/services/ai_service.py#L300-L310)
 - [app/services/ai_service.py:394-395](file://app/services/ai_service.py#L394-L395)
 - [app/blueprints/ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
-- [app/blueprints/ai.py:269-277](file://app/blueprints/ai.py#L269-L277)
+- [app/blueprints/ai.py:271-277](file://app/blueprints/ai.py#L271-L277)
 
 ## 结论
 本项目以 Karpathy 的 LLM Wiki 方法为核心，结合 Flask 的模块化架构，提供了从文档到维基条目、从链接解析到聊天问答的完整闭环。通过 OpenAI 兼容接口与可插拔的 RAG 能力，系统在易用性与扩展性之间取得平衡。建议在生产环境中开启异步构建、合理配置模型与上下文长度、并按需启用 RAG 以控制成本与性能。
-
-[本节为总结性内容，不直接分析具体文件，故无章节来源]
 
 ## 附录
 
@@ -389,14 +417,16 @@ REQ -.-> OPT
   - 表单字段：q（问题）
   - 响应：JSON {ok, answer|error}
 
+**更新** 路由参数已从<int:id>更新为<id>格式，确保与蓝图定义保持一致
+
 **章节来源**
-- [app/blueprints/ai.py:34-52](file://app/blueprints/ai.py#L34-L52)
-- [app/blueprints/ai.py:108-126](file://app/blueprints/ai.py#L108-L126)
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
-- [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
-- [app/blueprints/ai.py:194-236](file://app/blueprints/ai.py#L194-L236)
-- [app/blueprints/ai.py:251-260](file://app/blueprints/ai.py#L251-L260)
-- [app/blueprints/ai.py:265-278](file://app/blueprints/ai.py#L265-L278)
+- [app/blueprints/ai.py:34-54](file://app/blueprints/ai.py#L34-L54)
+- [app/blueprints/ai.py:110-128](file://app/blueprints/ai.py#L110-L128)
+- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
+- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
+- [app/blueprints/ai.py:196-250](file://app/blueprints/ai.py#L196-L250)
+- [app/blueprints/ai.py:253-262](file://app/blueprints/ai.py#L253-L262)
+- [app/blueprints/ai.py:267-280](file://app/blueprints/ai.py#L267-L280)
 
 ### 配置与部署要点
 - 必填配置
@@ -415,6 +445,10 @@ REQ -.-> OPT
 ### 前端模板与静态资源
 - 基础模板与导航栏、页脚、Flash 提示等组件通过基础模板统一加载。
 - 前端交互建议：使用 AJAX 调用构建状态接口轮询，聊天接口提交问题并展示结果。
+- 模板中使用的路由参数已更新为<ai_kb_id>格式，确保与蓝图定义一致。
 
 **章节来源**
 - [app/templates/base.html:1-29](file://app/templates/base.html#L1-L29)
+- [app/templates/ai/detail.html:11-76](file://app/templates/ai/detail.html#L11-L76)
+- [app/templates/ai/wiki_home.html:21-46](file://app/templates/ai/wiki_home.html#L21-L46)
+- [app/templates/ai/wiki_article.html:14-52](file://app/templates/ai/wiki_article.html#L14-L52)

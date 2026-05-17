@@ -1,5 +1,5 @@
 """Document blueprint."""
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required, current_user
 
 from ..extensions import db
@@ -47,6 +47,8 @@ def view(doc_id):
     kb = doc.kb
     if not kb_service.can_access(current_user, kb):
         abort(403)
+    if kb_service.requires_unlock(current_user, kb, session):
+        return redirect(url_for("kb.unlock", kb_id=kb.id, next=request.path))
     tree = doc_service.list_kb_doc_tree(kb.id)
     outline = extract_outline(doc.content_json)
     return render_template(

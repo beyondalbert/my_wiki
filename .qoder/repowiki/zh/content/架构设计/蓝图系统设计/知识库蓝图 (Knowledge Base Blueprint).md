@@ -14,6 +14,12 @@
 - [app/utils/decorators.py](file://app/utils/decorators.py)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 更新API接口说明，反映路由参数从 `<int:kb_id>` 到 `<kb_id>` 的变更
+- 更新前端交互示例，确保与实际路由参数保持一致
+- 修正路由参数类型说明，从整数类型改为字符串类型
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -27,7 +33,7 @@
 10. [附录](#附录)
 
 ## 简介
-本文件面向“知识库蓝图”功能模块，提供从架构到实现细节的完整说明。内容覆盖知识库的 CRUD 操作（创建、编辑、删除、可见性控制）、成员管理与权限控制、模板渲染、表单验证与数据持久化流程，并给出 API 接口说明与前端交互示例路径，帮助开发者快速理解与扩展。
+本文件面向"知识库蓝图"功能模块，提供从架构到实现细节的完整说明。内容覆盖知识库的 CRUD 操作（创建、编辑、删除、可见性控制）、成员管理与权限控制、模板渲染、表单验证与数据持久化流程，并给出 API 接口说明与前端交互示例路径，帮助开发者快速理解与扩展。
 
 ## 项目结构
 知识库蓝图位于应用的蓝本层（Blueprint），通过服务层协调模型层与工具层，配合扩展与配置完成认证、CSRF 保护与数据库会话管理。
@@ -71,7 +77,7 @@ UTIL_SEC --> CFG
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
@@ -83,7 +89,7 @@ UTIL_SEC --> CFG
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 
 **章节来源**
-- [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
@@ -102,7 +108,7 @@ UTIL_SEC --> CFG
 - 配置：数据库连接、AI 相关参数、上传与分页等全局设置。
 
 **章节来源**
-- [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
 - [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
@@ -127,7 +133,7 @@ participant S as "kb_service"
 participant D as "doc_service"
 participant M as "模型层"
 participant DB as "数据库"
-U->>V : "GET /kb/<id>"
+U->>V : "GET /kb/<kb_id>"
 V->>M : "按ID查询知识库"
 M-->>V : "返回知识库或空"
 V->>S : "can_access(user, kb)"
@@ -144,14 +150,14 @@ end
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:56-72](file://app/blueprints/kb.py#L56-L72)
+- [app/blueprints/kb.py:56-74](file://app/blueprints/kb.py#L56-L74)
 - [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
 - [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
 
 ## 详细组件分析
 
 ### 路由与视图（蓝图）
-- 列表页：支持“我的知识库/公开知识库”切换，调用服务层查询。
+- 列表页：支持"我的知识库/公开知识库"切换，调用服务层查询。
 - 新建知识库：表单提交后进行必填项与可见性校验，创建后写入数据库并跳转详情。
 - 详情页：校验访问权限，构建文档树，选择默认打开的首篇文档，传递可编辑/可管理标记。
 - 编辑知识库：仅管理员可编辑，更新名称、描述、可见性与图标。
@@ -171,12 +177,12 @@ Render --> End
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:56-72](file://app/blueprints/kb.py#L56-L72)
+- [app/blueprints/kb.py:56-74](file://app/blueprints/kb.py#L56-L74)
 - [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
 - [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
 
 **章节来源**
-- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
+- [app/blueprints/kb.py:21-171](file://app/blueprints/kb.py#L21-L171)
 
 ### 访问控制与权限
 - 可访问性判定：公开知识库直接放行；私有/成员可见需登录且满足所有条件之一：超级管理员、拥有者、成员。
@@ -229,7 +235,7 @@ participant U as "管理员"
 participant V as "members 路由"
 participant S as "kb_service.add_member/remove_member"
 participant DB as "数据库"
-U->>V : "POST /kb/<id>/members"
+U->>V : "POST /kb/<kb_id>/members"
 V->>S : "add_member(kb, user, role)"
 S->>DB : "查询/插入/更新"
 DB-->>S : "成功"
@@ -238,11 +244,11 @@ V-->>U : "闪存提示并重定向"
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:106-129](file://app/blueprints/kb.py#L106-L129)
+- [app/blueprints/kb.py:136-159](file://app/blueprints/kb.py#L136-L159)
 - [app/services/kb_service.py:65-79](file://app/services/kb_service.py#L65-L79)
 
 **章节来源**
-- [app/blueprints/kb.py:106-141](file://app/blueprints/kb.py#L106-L141)
+- [app/blueprints/kb.py:136-171](file://app/blueprints/kb.py#L136-L171)
 - [app/services/kb_service.py:65-79](file://app/services/kb_service.py#L65-L79)
 
 ### 文档树与内容持久化
@@ -271,8 +277,8 @@ R --> O["输出: 嵌套列表"]
 
 **章节来源**
 - [app/blueprints/kb.py:32-53](file://app/blueprints/kb.py#L32-L53)
-- [app/blueprints/kb.py:75-91](file://app/blueprints/kb.py#L75-L91)
-- [app/blueprints/kb.py:106-129](file://app/blueprints/kb.py#L106-L129)
+- [app/blueprints/kb.py:77-103](file://app/blueprints/kb.py#L77-L103)
+- [app/blueprints/kb.py:136-159](file://app/blueprints/kb.py#L136-L159)
 
 ### API 接口说明（蓝图路由）
 以下为知识库蓝图提供的端点（以蓝图前缀 /kb 开头）：
@@ -288,42 +294,51 @@ R --> O["输出: 嵌套列表"]
   - 表单字段：name（必填）、description、visibility（private/members/public）、icon
   - 行为：校验必填与可见性，创建知识库并重定向详情
   - 权限：登录用户
-- GET /kb/<int:kb_id>
+- GET /kb/<kb_id>
+  - 路由参数：kb_id（字符串类型）
   - 返回：知识库详情模板（含文档树与首篇文档）
   - 权限：可访问（公开/成员/拥有者）
-- GET /kb/<int:kb_id>/edit
+- GET /kb/<kb_id>/edit
+  - 路由参数：kb_id（字符串类型）
   - 返回：编辑知识库模板
   - 权限：可管理（拥有者）
-- POST /kb/<int:kb_id>/edit
+- POST /kb/<kb_id>/edit
+  - 路由参数：kb_id（字符串类型）
   - 表单字段：name、description、visibility、icon
   - 行为：更新知识库信息并重定向详情
   - 权限：可管理（拥有者）
-- POST /kb/<int:kb_id>/delete
+- POST /kb/<kb_id>/delete
+  - 路由参数：kb_id（字符串类型）
   - 行为：将知识库标记为归档并重定向列表
   - 权限：可管理（拥有者）
-- GET /kb/<int:kb_id>/members
+- GET /kb/<kb_id>/members
+  - 路由参数：kb_id（字符串类型）
   - 返回：成员管理模板
   - 权限：可管理（拥有者）
-- POST /kb/<int:kb_id>/members
+- POST /kb/<kb_id>/members
+  - 路由参数：kb_id（字符串类型）
   - 表单字段：user（用户名或邮箱）、role（viewer/editor）
   - 行为：添加成员或更新角色
   - 权限：可管理（拥有者）
-- POST /kb/<int:kb_id>/members/<int:user_id>/delete
+- POST /kb/<kb_id>/members/<int:user_id>/delete
+  - 路由参数：kb_id（字符串类型）、user_id（整数类型）
   - 行为：移除成员并重定向成员页
   - 权限：可管理（拥有者）
 
+**更新** 路由参数类型从 `<int:kb_id>` 更新为 `<kb_id>`，现在使用字符串类型作为路由参数。同时，`/kb/<kb_id>/members/<int:user_id>/delete` 路由保持整数类型参数。
+
 **章节来源**
-- [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
+- [app/blueprints/kb.py:21-171](file://app/blueprints/kb.py#L21-L171)
 
 ### 前端交互示例（路径参考）
 - 新建知识库：在新建模板中提交表单至 /kb/new，表单字段与验证逻辑见蓝图处理。
-- 编辑知识库：在编辑模板中提交表单至 /kb/<id>/edit，字段与可见性校验见蓝图处理。
-- 成员管理：在成员模板中提交表单至 /kb/<id>/members，字段与角色校验见蓝图处理。
+- 编辑知识库：在编辑模板中提交表单至 /kb/<kb_id>/edit，字段与可见性校验见蓝图处理。
+- 成员管理：在成员模板中提交表单至 /kb/<kb_id>/members，字段与角色校验见蓝图处理。
 - 详情页：渲染知识库详情与文档树，根据 can_edit/can_manage 控制按钮显示。
 
 **章节来源**
-- [app/blueprints/kb.py:32-91](file://app/blueprints/kb.py#L32-L91)
-- [app/blueprints/kb.py:106-141](file://app/blueprints/kb.py#L106-L141)
+- [app/blueprints/kb.py:32-103](file://app/blueprints/kb.py#L32-L103)
+- [app/blueprints/kb.py:136-171](file://app/blueprints/kb.py#L136-L171)
 
 ## 依赖分析
 - 蓝图依赖服务层与工具层，服务层依赖模型层与扩展，模型层依赖数据库。
@@ -343,7 +358,7 @@ KB_BP --> DEC["工具: decorators"]
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
@@ -355,7 +370,7 @@ KB_BP --> DEC["工具: decorators"]
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 
 **章节来源**
-- [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)

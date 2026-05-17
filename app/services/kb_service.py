@@ -45,6 +45,41 @@ def can_manage(user, kb: KnowledgeBase | None) -> bool:
     return kb.owner_id == user.id
 
 
+KB_UNLOCK_SESSION_PREFIX = "_kb_unlocked:"
+
+
+def is_password_protected(kb: KnowledgeBase | None) -> bool:
+    """公开知识库且设了访问密码。"""
+    if kb is None:
+        return False
+    return kb.is_public and kb.has_access_password
+
+
+def is_unlocked(session, kb: KnowledgeBase) -> bool:
+    return bool(session.get(KB_UNLOCK_SESSION_PREFIX + str(kb.id)))
+
+
+def mark_unlocked(session, kb: KnowledgeBase) -> None:
+    session[KB_UNLOCK_SESSION_PREFIX + str(kb.id)] = True
+
+
+def requires_unlock(user, kb: KnowledgeBase, session) -> bool:
+    """当前用户访问该 KB 是否需要先输入访问密码。
+
+    豁免：owner / 成员 / 超管 / 已解锁。
+    """
+    if not is_password_protected(kb):
+        return False
+    if user is not None and getattr(user, "is_authenticated", False):
+        if getattr(user, "is_super_admin", False):
+            return False
+        if kb.owner_id == user.id:
+            return False
+        if KBMember.query.filter_by(kb_id=kb.id, user_id=user.id).first() is not None:
+            return False
+    return not is_unlocked(session, kb)
+
+
 def list_my_kbs(user: User):
     own = KnowledgeBase.query.filter_by(owner_id=user.id, is_archived=False)
     member_ids = [m.kb_id for m in KBMember.query.filter_by(user_id=user.id).all()]

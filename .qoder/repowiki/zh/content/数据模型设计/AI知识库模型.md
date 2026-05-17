@@ -8,10 +8,20 @@
 - [app/services/ai_service.py](file://app/services/ai_service.py)
 - [app/services/kb_service.py](file://app/services/kb_service.py)
 - [app/blueprints/ai.py](file://app/blueprints/ai.py)
+- [app/blueprints/kb.py](file://app/blueprints/kb.py)
 - [app/utils/markdown.py](file://app/utils/markdown.py)
+- [app/utils/ids.py](file://app/utils/ids.py)
 - [app/config.py](file://app/config.py)
 - [app/extensions.py](file://app/extensions.py)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新所有AI相关模型的ID类型说明，从整数ID变更为字符串ID
+- 更新外键关系说明，反映字符串ID的外键约束
+- 更新数据模型字段定义，体现新的ID类型
+- 更新依赖关系分析，反映ID类型变更对关系的影响
+- 更新性能考虑部分，说明字符串ID对索引和查询的影响
 
 ## 目录
 1. [简介](#简介)
@@ -26,11 +36,13 @@
 10. [附录](#附录)
 
 ## 简介
-本文件聚焦于“AI知识库模型”的数据模型设计与实现，系统性阐述 AIKnowledgeBase 数据模型的字段定义、数据类型与业务规则，以及其与传统知识库（KnowledgeBase）的差异与联系。文档还覆盖了 AI 知识库的构建状态管理（索引创建、更新与维护）、搜索机制（关键词匹配与可选的向量检索）、性能优化策略（索引压缩、缓存与查询优化），并给出典型使用场景与数据处理流程。
+本文件聚焦于"AI知识库模型"的数据模型设计与实现，系统性阐述 AIKnowledgeBase 数据模型的字段定义、数据类型与业务规则，以及其与传统知识库（KnowledgeBase）的差异与联系。文档还覆盖了 AI 知识库的构建状态管理（索引创建、更新与维护）、搜索机制（关键词匹配与可选的向量检索）、性能优化策略（索引压缩、缓存与查询优化），并给出典型使用场景与数据处理流程。
+
+**重要更新**：所有AI相关模型的ID类型已从整数变更为字符串，使用12字符的随机字符串ID，提供更好的URL友好性和安全性。
 
 ## 项目结构
-该项目采用 Flask + SQLAlchemy 的分层架构，围绕“知识库”与“AI知识库”两条主线组织代码：
-- 模型层：定义数据库表结构与关系
+该项目采用 Flask + SQLAlchemy 的分层架构，围绕"知识库"与"AI知识库"两条主线组织代码：
+- 模型层：定义数据库表结构与关系（所有ID均为字符串类型）
 - 服务层：封装业务逻辑（LLM 调用、Wiki 构建、链接解析、聊天）
 - 蓝图层：路由与视图控制
 - 工具层：Markdown 渲染与链接收集
@@ -39,8 +51,8 @@
 ```mermaid
 graph TB
 subgraph "模型层"
-A1["AIKnowledgeBase<br/>AIKBSource<br/>AIKBArticle<br/>AIKBLink<br/>AIKBChunk"]
-A2["KnowledgeBase<br/>KBMember"]
+A1["AIKnowledgeBase<br/>AIKBSource<br/>AIKBArticle<br/>AIKBLink<br/>AIKBChunk<br/>字符串ID"]
+A2["KnowledgeBase<br/>KBMember<br/>Document<br/>字符串ID"]
 A3["Document"]
 end
 subgraph "服务层"
@@ -49,9 +61,11 @@ S2["kb_service.py<br/>可见性/成员权限"]
 end
 subgraph "蓝图层"
 B1["ai.py<br/>路由/视图/状态查询"]
+B2["kb.py<br/>路由/视图/权限管理"]
 end
 subgraph "工具层"
 U1["markdown.py<br/>渲染/链接收集"]
+U2["ids.py<br/>字符串ID生成器"]
 end
 subgraph "配置与扩展"
 C1["config.py<br/>配置项"]
@@ -61,38 +75,45 @@ A1 --> S1
 A2 --> S2
 A3 --> S1
 S1 --> B1
-S2 --> B1
+S2 --> B2
 U1 --> B1
+U2 --> A1
+U2 --> A2
+U2 --> A3
 C1 --> S1
 E1 --> A1
 E1 --> A2
 E1 --> A3
 ```
 
-图表来源
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
-- [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+**图表来源**
+- [app/models/ai_kb.py:23-121](file://app/models/ai_kb.py#L23-L121)
+- [app/models/knowledge_base.py:22-81](file://app/models/knowledge_base.py#L22-L81)
+- [app/models/document.py:21-98](file://app/models/document.py#L21-L98)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+- [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
-章节来源
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
-- [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+**章节来源**
+- [app/models/ai_kb.py:23-121](file://app/models/ai_kb.py#L23-L121)
+- [app/models/knowledge_base.py:22-81](file://app/models/knowledge_base.py#L22-L81)
+- [app/models/document.py:21-98](file://app/models/document.py#L21-L98)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+- [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
 ## 核心组件
-本节聚焦 AI 知识库的核心数据模型及其关键字段、枚举与关系。
+本节聚焦 AI 知识库的核心数据模型及其关键字段、枚举与关系。**所有ID均采用字符串类型，长度为12字符**。
 
 - AIKBStatus 枚举：表示 AI 知识库整体构建状态（空闲、构建中、就绪、失败）
 - AIKBSourceStatus 枚举：表示单个源文档的处理状态（待处理、处理中、已处理、失败）
@@ -102,11 +123,12 @@ E1 --> A3
 - AIKBLink 实体：条目间的双向链接，支持红链（未命中的占位）
 - AIKBChunk 实体：可选的文档切片元数据，向量本体存储于外部向量库（默认不启用）
 
-章节来源
+**章节来源**
 - [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
+- [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)
 
 ## 架构总览
-AI 知识库的实现遵循“文档 → 文章 → 链接”的三层结构，结合可选的 RAG 向量检索能力。整体流程如下：
+AI 知识库的实现遵循"文档 → 文章 → 链接"的三层结构，结合可选的 RAG 向量检索能力。整体流程如下：
 
 ```mermaid
 sequenceDiagram
@@ -115,19 +137,19 @@ participant 路由 as "蓝图(ai.py)"
 participant 服务 as "ai_service.py"
 participant LLM as "LLMClient"
 participant DB as "数据库(SQLAlchemy)"
-用户->>路由 : 触发“构建”请求
+用户->>路由 : 触发"构建"请求
 路由->>服务 : 调用异步构建函数
 服务->>DB : 查询待处理源文档
 服务->>LLM : 对每个源文档调用 LLM 生成文章草稿
 LLM-->>服务 : 返回 JSON 草稿
 服务->>DB : 写入/更新 AIKBArticle 并持久化
 服务->>DB : 扫描 [[...]] 占位符并建立 AIKBLink
-服务->>DB : 更新 AIKnowledgeBase 状态为“就绪”
+服务->>DB : 更新 AIKnowledgeBase 状态为"就绪"
 路由-->>用户 : 返回构建完成状态
 ```
 
-图表来源
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
+**图表来源**
+- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
@@ -136,7 +158,7 @@ LLM-->>服务 : 返回 JSON 草稿
 
 ### AIKnowledgeBase 数据模型详解
 - 字段与类型
-  - id: 整数主键
+  - id: 字符串主键，长度12字符，使用 `generate_id` 生成
   - owner_id: 整数外键，指向用户表，级联删除；非空且建立索引
   - name: 字符串，长度上限 128，非空
   - description: 字符串，长度上限 500，缺省为空
@@ -153,14 +175,14 @@ LLM-->>服务 : 返回 JSON 草稿
   - enable_rag 控制是否启用向量检索（本仓库当前实现默认不强制依赖向量库）
   - status 字段驱动 UI 与后台任务的状态机
 
-章节来源
-- [app/models/ai_kb.py:22-44](file://app/models/ai_kb.py#L22-L44)
+**章节来源**
+- [app/models/ai_kb.py:23-44](file://app/models/ai_kb.py#L23-L44)
 
 ### AIKBSource 数据模型详解
 - 字段与类型
-  - id: 整数主键
-  - ai_kb_id: 整数外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
-  - doc_id: 整数外键，指向 Document，级联删除；非空且建立索引
+  - id: 字符串主键，长度12字符，使用 `generate_id` 生成
+  - ai_kb_id: 字符串外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
+  - doc_id: 字符串外键，指向 Document，级联删除；非空且建立索引
   - status: 字符串，取值来自 AIKBSourceStatus 枚举，默认 pending，非空且建立索引
   - err_msg: 字符串，长度上限 500
   - created_at/updated_at: 日期时间
@@ -170,13 +192,13 @@ LLM-->>服务 : 返回 JSON 草稿
   - 与 AIKnowledgeBase 的一对多关系（反向为 sources）
   - 与 Document 的多对一关系
 
-章节来源
-- [app/models/ai_kb.py:46-64](file://app/models/ai_kb.py#L46-L64)
+**章节来源**
+- [app/models/ai_kb.py:47-65](file://app/models/ai_kb.py#L47-L65)
 
 ### AIKBArticle 数据模型详解
 - 字段与类型
-  - id: 整数主键
-  - ai_kb_id: 整数外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
+  - id: 字符串主键，长度12字符，使用 `generate_id` 生成
+  - ai_kb_id: 字符串外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
   - title: 字符串，长度上限 255，非空
   - slug: 字符串，长度上限 255，非空且建立索引
   - summary: 字符串，长度上限 500
@@ -190,28 +212,28 @@ LLM-->>服务 : 返回 JSON 草稿
 - 关系
   - 与 AIKnowledgeBase 的一对多关系（反向为 articles）
 
-章节来源
-- [app/models/ai_kb.py:66-91](file://app/models/ai_kb.py#L66-L91)
+**章节来源**
+- [app/models/ai_kb.py:67-92](file://app/models/ai_kb.py#L67-L92)
 
 ### AIKBLink 数据模型详解
 - 字段与类型
-  - id: 整数主键
-  - ai_kb_id: 整数外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
-  - from_article_id: 整数外键，指向 AIKBArticle，级联删除；非空且建立索引
-  - to_article_id: 整数外键，指向 AIKBArticle，删除时置空；可为空（红链）
+  - id: 字符串主键，长度12字符，使用 `generate_id` 生成
+  - ai_kb_id: 字符串外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
+  - from_article_id: 字符串外键，指向 AIKBArticle，级联删除；非空且建立索引
+  - to_article_id: 字符串外键，指向 AIKBArticle，删除时置空；可为空（红链）
   - anchor_text: 字符串，长度上限 255，存储锚文本
   - created_at: 日期时间
 - 关系
   - 与 AIKBArticle 的多对一关系（from_article/to_article），分别反向为 outgoing_links/incoming_links
 
-章节来源
-- [app/models/ai_kb.py:93-108](file://app/models/ai_kb.py#L93-L108)
+**章节来源**
+- [app/models/ai_kb.py:94-109](file://app/models/ai_kb.py#L94-L109)
 
 ### AIKBChunk 数据模型详解
 - 字段与类型
-  - id: 整数主键
-  - ai_kb_id: 整数外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
-  - article_id: 整数外键，指向 AIKBArticle，级联删除；非空且建立索引
+  - id: 字符串主键，长度12字符，使用 `generate_id` 生成
+  - ai_kb_id: 字符串外键，指向 AIKnowledgeBase，级联删除；非空且建立索引
+  - article_id: 字符串外键，指向 AIKBArticle，级联删除；非空且建立索引
   - chunk_idx: 整数，切片序号
   - content: 文本，切片内容
   - vector_id: 字符串，长度上限 64，建立索引
@@ -219,22 +241,23 @@ LLM-->>服务 : 返回 JSON 草稿
 - 使用说明
   - 当 enable_rag=true 时启用；向量本体存储于外部向量库（本仓库默认不强制依赖向量库）
 
-章节来源
-- [app/models/ai_kb.py:110-121](file://app/models/ai_kb.py#L110-L121)
+**章节来源**
+- [app/models/ai_kb.py:111-122](file://app/models/ai_kb.py#L111-L122)
 
 ### 与传统知识库的关系与差异
 - 关系
-  - AI 知识库以“文档”为输入源，通过 LLM 重写为“文章”，再进行链接解析，形成 Wiki 图谱
-  - 传统知识库以“知识库”为单位，强调可见性与成员管理
+  - AI 知识库以"文档"为输入源，通过 LLM 重写为"文章"，再进行链接解析，形成 Wiki 图谱
+  - 传统知识库以"知识库"为单位，强调可见性与成员管理
 - 差异
   - 数据来源：AI 知识库来源于文档（Document），传统知识库来源于知识库（KnowledgeBase）
   - 处理流程：AI 知识库包含 LLM 重写、链接解析、可选向量检索；传统知识库侧重内容管理与权限控制
   - 存储方式：AI 知识库以 Markdown 文件形式落地（可选向量本体），传统知识库以数据库表为主
+  - ID 类型：两者均采用字符串ID，提供更好的URL友好性
 
-章节来源
-- [app/models/ai_kb.py:46-91](file://app/models/ai_kb.py#L46-L91)
-- [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+**章节来源**
+- [app/models/ai_kb.py:47-92](file://app/models/ai_kb.py#L47-L92)
+- [app/models/knowledge_base.py:22-81](file://app/models/knowledge_base.py#L22-L81)
+- [app/models/document.py:21-98](file://app/models/document.py#L21-L98)
 
 ### 构建状态管理（索引创建/更新/维护）
 - 状态机
@@ -258,14 +281,14 @@ stateDiagram-v2
 失败 --> 构建中 : "修复后重试"
 ```
 
-图表来源
-- [app/models/ai_kb.py:8-13](file://app/models/ai_kb.py#L8-L13)
-- [app/models/ai_kb.py:15-19](file://app/models/ai_kb.py#L15-L19)
+**图表来源**
+- [app/models/ai_kb.py:9-21](file://app/models/ai_kb.py#L9-L21)
+- [app/models/ai_kb.py:16-21](file://app/models/ai_kb.py#L16-L21)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:296-382](file://app/services/ai_service.py#L296-L382)
-- [app/blueprints/ai.py:143-173](file://app/blueprints/ai.py#L143-L173)
+- [app/blueprints/ai.py:145-176](file://app/blueprints/ai.py#L145-L176)
 
 ### 搜索机制（关键词匹配与可选向量检索）
 - 关键词匹配（默认）
@@ -287,11 +310,11 @@ Context --> LLM["调用 LLM 生成答案"]
 LLM --> End(["结束"])
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
 
@@ -299,7 +322,7 @@ LLM --> End(["结束"])
 - 场景一：从文档库导入文档，生成 AI 知识库文章并建立链接
   - 步骤：选择文档 → 添加为源文档 → 异步构建 → 查看文章与链接图谱
 - 场景二：对单篇文档进行重新生成
-  - 步骤：定位文章 → 触发“重生”任务 → 重新生成并更新链接
+  - 步骤：定位文章 → 触发"重生"任务 → 重新生成并更新链接
 - 场景三：启用 RAG 进行问答
   - 步骤：开启 enable_rag → 构建完成后进行向量检索与问答
 
@@ -316,74 +339,84 @@ participant DB as "数据库"
 蓝图-->>用户 : 展示文章与链接
 ```
 
-图表来源
-- [app/blueprints/ai.py:108-127](file://app/blueprints/ai.py#L108-L127)
+**图表来源**
+- [app/blueprints/ai.py:110-129](file://app/blueprints/ai.py#L110-L129)
 - [app/services/ai_service.py:204-231](file://app/services/ai_service.py#L204-L231)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 
-章节来源
-- [app/blueprints/ai.py:108-127](file://app/blueprints/ai.py#L108-L127)
+**章节来源**
+- [app/blueprints/ai.py:110-129](file://app/blueprints/ai.py#L110-L129)
 - [app/services/ai_service.py:204-231](file://app/services/ai_service.py#L204-L231)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 
 ## 依赖关系分析
 - 模型间依赖
-  - AIKnowledgeBase ←→ AIKBSource/Article/Link/Chunk（一对多/多对一）
-  - KnowledgeBase ←→ KBMember（一对多/多对一）
-  - Document ←→ KnowledgeBase（一对多/多对一）
+  - AIKnowledgeBase ←→ AIKBSource/Article/Link/Chunk（一对多/多对一，所有外键均为字符串类型）
+  - KnowledgeBase ←→ KBMember（一对多/多对一，所有外键均为字符串类型）
+  - Document ←→ KnowledgeBase（一对多/多对一，所有外键均为字符串类型）
 - 服务与模型依赖
   - ai_service 依赖 AIKnowledgeBase/AIKBSource/AIKBArticle/AIKBLink/Document
   - kb_service 依赖 KnowledgeBase/KBMember/User
 - 蓝图与服务依赖
   - ai.py 依赖 ai_service 与 kb_service，负责路由与视图
+  - kb.py 依赖 kb_service 与 doc_service，负责知识库管理
 - 工具与渲染
   - markdown.py 提供 Wiki 链接解析与渲染
+  - ids.py 提供字符串ID生成器
 - 配置与扩展
   - config.py 提供 OPENAI_BASE_URL/API_KEY/CHAT_MODEL/AI_WIKI_DIR/ENABLE_RAG/CHROMA_PATH 等配置
   - extensions.py 提供 db/migrate/login/csrf 单例
 
 ```mermaid
 graph LR
-AI["AIKnowledgeBase"] --> SRC["AIKBSource"]
-AI --> ART["AIKBArticle"]
-ART --> LINK["AIKBLink"]
-AI --> CHUNK["AIKBChunk"]
-KB["KnowledgeBase"] --> MEM["KBMember"]
-DOC["Document"] --> KB
+AI["AIKnowledgeBase<br/>字符串ID"] --> SRC["AIKBSource<br/>字符串ID"]
+AI --> ART["AIKBArticle<br/>字符串ID"]
+ART --> LINK["AIKBLink<br/>字符串ID"]
+AI --> CHUNK["AIKBChunk<br/>字符串ID"]
+KB["KnowledgeBase<br/>字符串ID"] --> MEM["KBMember<br/>字符串ID"]
+DOC["Document<br/>字符串ID"] --> KB
 SVC_AI["ai_service"] --> AI
 SVC_AI --> ART
 SVC_AI --> LINK
 SVC_AI --> DOC
 SVC_KB["kb_service"] --> KB
 SVC_KB --> MEM
-BP["ai.py"] --> SVC_AI
-BP --> SVC_KB
-MD["markdown.py"] --> BP
+BP_AI["ai.py"] --> SVC_AI
+BP_AI --> SVC_KB
+BP_KB["kb.py"] --> SVC_KB
+MD["markdown.py"] --> BP_AI
+IDS["ids.py<br/>字符串ID生成器"] --> AI
+IDS --> KB
+IDS --> DOC
 CFG["config.py"] --> SVC_AI
 EXT["extensions.py"] --> AI
 EXT --> KB
 EXT --> DOC
 ```
 
-图表来源
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
-- [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+**图表来源**
+- [app/models/ai_kb.py:23-121](file://app/models/ai_kb.py#L23-L121)
+- [app/models/knowledge_base.py:22-81](file://app/models/knowledge_base.py#L22-L81)
+- [app/models/document.py:21-98](file://app/models/document.py#L21-L98)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+- [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
-章节来源
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
-- [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
-- [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
+**章节来源**
+- [app/models/ai_kb.py:23-121](file://app/models/ai_kb.py#L23-L121)
+- [app/models/knowledge_base.py:22-81](file://app/models/knowledge_base.py#L22-L81)
+- [app/models/document.py:21-98](file://app/models/document.py#L21-L98)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+- [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
+- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
@@ -391,6 +424,7 @@ EXT --> DOC
 - 索引与查询优化
   - 为 owner_id、ai_kb_id、doc_id、slug、vector_id 等关键字段建立索引，提升过滤与连接效率
   - 在 AIKBArticle 上对 slug 建立唯一索引，确保链接解析高效
+  - **字符串ID的索引性能**：字符串ID（12字符）相比整数ID在某些场景下可能有轻微的性能影响，但在实际应用中差异很小
 - 文档与文章规模控制
   - 对 LLM 输入进行长度限制（如安全上限），减少无效计算
   - 分页加载文章列表，避免一次性查询过多数据
@@ -399,13 +433,18 @@ EXT --> DOC
 - 向量检索（可选）
   - 启用 RAG 时，合理设置向量维度与相似度阈值，避免过度召回
   - 定期清理无效向量与冗余切片，保持向量库健康
+- **ID类型优势**
+  - 字符串ID提供更好的URL友好性，便于直接在URL中使用
+  - 基于 `secrets` 库的安全随机生成，提供更好的安全性
+  - 去除易混淆字符的字符集设计，提高可读性
 
-章节来源
+**章节来源**
 - [app/models/ai_kb.py:26-38](file://app/models/ai_kb.py#L26-L38)
 - [app/models/ai_kb.py:77-82](file://app/models/ai_kb.py#L77-L82)
 - [app/models/ai_kb.py:119](file://app/models/ai_kb.py#L119)
 - [app/services/ai_service.py:149-150](file://app/services/ai_service.py#L149-L150)
 - [app/config.py:42-47](file://app/config.py#L42-L47)
+- [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)
 
 ## 故障排查指南
 - 构建失败
@@ -419,15 +458,20 @@ EXT --> DOC
 - RAG 未生效
   - 确认 ENABLE_RAG 已开启，CHROMA_PATH 指向有效路径
   - 检查 AIKBChunk.vector_id 是否正确写入
+- **ID相关问题**
+  - 确认所有字符串ID格式正确（12字符）
+  - 检查外键关系是否使用正确的字符串ID
+  - 验证URL中使用的ID格式是否符合预期
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/services/ai_service.py:307-310](file://app/services/ai_service.py#L307-L310)
 - [app/utils/markdown.py:69-87](file://app/utils/markdown.py#L69-L87)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
+- [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)
 
 ## 结论
-本项目以“Karpathy LLM Wiki”方法论为核心，将文档转换为结构化的 Wiki 条目，通过双向链接形成知识图谱，并提供可选的向量检索增强问答能力。AIKnowledgeBase 模型通过状态机与唯一约束保障构建流程的可靠性，配合蓝图与服务层实现完整的生命周期管理。在性能方面，通过索引、文件落盘与可选向量库实现平衡的读写与查询体验。
+本项目以"Karpathy LLM Wiki"方法论为核心，将文档转换为结构化的 Wiki 条目，通过双向链接形成知识图谱，并提供可选的向量检索增强问答能力。**所有AI相关模型均采用字符串ID设计，提供更好的URL友好性和安全性**。AIKnowledgeBase 模型通过状态机与唯一约束保障构建流程的可靠性，配合蓝图与服务层实现完整的生命周期管理。在性能方面，通过索引、文件落盘与可选向量库实现平衡的读写与查询体验。
 
 ## 附录
 - 关键配置项
@@ -439,8 +483,13 @@ EXT --> DOC
   - AIKBSourceStatus：pending/processing/processed/failed
   - KBVisibility：private/members/public
   - KBMemberRole：viewer/editor
+- **ID生成器**
+  - generate_id：12字符字符串ID生成器，使用base62字符集（去除易混淆字符）
+  - 安全性：基于 `secrets` 库的加密安全随机数生成
+  - URL友好性：适合直接在URL中使用
 
-章节来源
+**章节来源**
 - [app/config.py:37-47](file://app/config.py#L37-L47)
-- [app/models/ai_kb.py:8-19](file://app/models/ai_kb.py#L8-L19)
-- [app/models/knowledge_base.py:8-17](file://app/models/knowledge_base.py#L8-L17)
+- [app/models/ai_kb.py:8-21](file://app/models/ai_kb.py#L8-L21)
+- [app/models/knowledge_base.py:11-20](file://app/models/knowledge_base.py#L11-L20)
+- [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)

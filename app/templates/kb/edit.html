@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}编辑知识库 · {{ site_name }}{% endblock %}
 {% block content %}
-<div class="max-w-2xl mx-auto px-4 py-10">
+<div class="max-w-2xl mx-auto px-4 py-10" x-data="{ visibility: '{{ kb.visibility }}', changePwd: false }">
   <h1 class="text-2xl font-bold text-slate-800 mb-6">编辑知识库</h1>
   <form method="post" class="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
@@ -17,21 +17,61 @@
     </div>
     <div>
       <label class="block text-sm font-medium text-slate-700 mb-1">可见性</label>
-      <select name="visibility" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+      <select name="visibility" x-model="visibility"
+              class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
         <option value="private" {{ 'selected' if kb.visibility=='private' }}>私密</option>
         <option value="members" {{ 'selected' if kb.visibility=='members' }}>成员</option>
         <option value="public"  {{ 'selected' if kb.visibility=='public'  }}>公开</option>
       </select>
     </div>
+
+    {# 访问密码：仅 visibility=public 时显示 #}
+    <div x-show="visibility === 'public'" x-cloak
+         class="border-t border-slate-100 pt-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <span class="text-sm font-medium text-slate-700">🔒 访问密码</span>
+        {% if kb.has_access_password %}
+          <span class="text-xs px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">已设置</span>
+        {% else %}
+          <span class="text-xs px-2 py-0.5 rounded-full bg-slate-50 text-slate-500 border border-slate-200">未设置</span>
+        {% endif %}
+      </div>
+      <p class="text-xs text-slate-500">设置后，非 owner / 成员的访客需先输入此密码才能查看该知识库。</p>
+
+      {% if kb.has_access_password %}
+        <div class="flex flex-wrap items-center gap-3">
+          <button type="button" @click="changePwd = !changePwd"
+                  class="text-xs px-3 py-1 border border-slate-300 rounded hover:bg-slate-50 text-slate-700">
+            <span x-text="changePwd ? '取消修改' : '修改密码'"></span>
+          </button>
+          <label class="flex items-center gap-1 text-xs text-rose-600 cursor-pointer">
+            <input type="checkbox" name="clear_access_password" value="1" class="rounded" />
+            清除密码（保存后任何人可看）
+          </label>
+        </div>
+        <div x-show="changePwd" x-cloak>
+          <input name="access_password" type="password" minlength="4" maxlength="64"
+                 placeholder="输入新密码以替换"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+        </div>
+      {% else %}
+        <input name="access_password" type="password" minlength="4" maxlength="64"
+               placeholder="留空表示不设密码"
+               class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+      {% endif %}
+    </div>
+
     <div class="flex gap-2 pt-2">
       <button class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-500" type="submit">保存</button>
       <a class="px-4 py-2 border border-slate-300 rounded-lg hover:bg-slate-50" href="{{ url_for('kb.detail', kb_id=kb.id) }}">取消</a>
-      <form method="post" action="{{ url_for('kb.delete_kb', kb_id=kb.id) }}" class="ml-auto"
-            onsubmit="return confirm('确认归档此知识库吗？')">
-        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-        <button class="px-4 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" type="submit">归档</button>
-      </form>
     </div>
+  </form>
+
+  {# 独立归档表单，避免 form 嵌套 #}
+  <form method="post" action="{{ url_for('kb.delete_kb', kb_id=kb.id) }}" class="mt-4 flex justify-end"
+        onsubmit="return confirm('确认归档此知识库吗？')">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    <button class="px-4 py-2 border border-rose-200 text-rose-600 rounded-lg hover:bg-rose-50" type="submit">归档知识库</button>
   </form>
 </div>
 {% endblock %}

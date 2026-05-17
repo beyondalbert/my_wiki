@@ -10,6 +10,7 @@
 - [app/config.py](file://app/config.py)
 - [app/extensions.py](file://app/extensions.py)
 - [app/__init__.py](file://app/__init__.py)
+- [app/utils/ids.py](file://app/utils/ids.py)
 - [requirements.txt](file://requirements.txt)
 </cite>
 
@@ -26,7 +27,9 @@
 10. [附录](#附录)
 
 ## 简介
-本文件面向AI知识库服务层，系统化梳理从源文档到Wiki条目的完整处理链路，覆盖状态机管理、源文档处理管道、错误恢复机制、链接解析与跨文档引用、向量嵌入与RAG检索（可选）、增量更新策略、缓存与性能优化、OpenAI兼容SDK封装、并发与后台任务调度，以及蓝图层交互与中间件集成。文档以“可读性优先”的原则，结合图示与路径引用，帮助开发者快速理解与扩展。
+本文件面向AI知识库服务层，系统化梳理从源文档到Wiki条目的完整处理链路，覆盖状态机管理、源文档处理管道、错误恢复机制、链接解析与跨文档引用、向量嵌入与RAG检索（可选）、增量更新策略、缓存与性能优化、OpenAI兼容SDK封装、并发与后台任务调度，以及蓝图层交互与中间件集成。文档以"可读性优先"的原则，结合图示与路径引用，帮助开发者快速理解与扩展。
+
+**更新** 服务层现已采用字符串ID处理模式，所有AI知识库相关函数均接受字符串类型的ID参数，确保与模型层的统一性和类型安全性。
 
 ## 项目结构
 - 服务层位于 app/services，核心为 ai_service.py，负责LLM封装、Wiki构建、链接解析、异步构建与RAG问答。
@@ -35,6 +38,7 @@
 - 蓝图层位于 app/blueprints，ai.py 提供知识库管理、构建、浏览、图谱、聊天等路由。
 - 配置与扩展位于 app/config.py 与 app/extensions.py，统一注入数据库、登录、CSRF、AI相关参数。
 - 应用工厂位于 app/__init__.py，注册蓝图、扩展与上下文处理器。
+- ID生成工具位于 app/utils/ids.py，提供短URL友好的随机ID生成器。
 
 ```mermaid
 graph TB
@@ -42,6 +46,7 @@ subgraph "应用层"
 BP_AI["蓝图: ai.py"]
 CFG["配置: config.py"]
 EXT["扩展: extensions.py"]
+ID_GEN["ID生成: utils/ids.py"]
 end
 subgraph "服务层"
 SVC_AI["服务: ai_service.py"]
@@ -59,26 +64,29 @@ SVC_AI --> U_MD
 SVC_AI --> U_OUT
 BP_AI --> CFG
 BP_AI --> EXT
+ID_GEN --> M_AIKB
 ```
 
-图表来源
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+**图表来源**
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
+- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-136](file://app/utils/outline.py#L1-L136)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 
-章节来源
+**章节来源**
 - [app/__init__.py:11-101](file://app/__init__.py#L11-L101)
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
+- [app/blueprints/ai.py:1-281](file://app/blueprints/ai.py#L1-L281)
 - [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
-- [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
+- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-136](file://app/utils/outline.py#L1-L136)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 
 ## 核心组件
 - LLM客户端封装：统一OpenAI兼容SDK调用，支持多厂商与本地代理，动态加载client，避免重复初始化。
@@ -87,8 +95,9 @@ BP_AI --> EXT
 - 异步构建流水线：后台线程执行构建，维护源文档状态机与知识库整体状态机，失败回滚与错误消息持久化。
 - 可选RAG问答：基于关键词重排Top-N条目，拼接上下文后调用LLM回答；向量存储与嵌入模型预留（需启用RAG）。
 - 蓝图交互：提供知识库创建、编辑、构建、浏览、图谱、聊天等端点，配合权限控制与状态查询。
+- **字符串ID处理**：所有服务函数现在明确接受字符串类型的AI知识库ID参数，确保类型安全和一致性。
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
@@ -97,7 +106,7 @@ BP_AI --> EXT
 - [app/blueprints/ai.py:143-173](file://app/blueprints/ai.py#L143-L173)
 
 ## 架构总览
-服务层围绕“知识库-源文档-文章-链接”四元组展开，通过LLM生成文章，再进行wikilink解析，最终形成可浏览的Wiki与可选的RAG问答能力。蓝图层负责权限校验、状态查询与UI交互，配置层提供模型与目录参数。
+服务层围绕"知识库-源文档-文章-链接"四元组展开，通过LLM生成文章，再进行wikilink解析，最终形成可浏览的Wiki与可选的RAG问答能力。蓝图层负责权限校验、状态查询与UI交互，配置层提供模型与目录参数。所有ID现在统一使用字符串类型，确保跨层一致性和类型安全。
 
 ```mermaid
 sequenceDiagram
@@ -107,8 +116,8 @@ participant Svc as "服务 : ai_service.py"
 participant DB as "数据库 : ai_kb.py"
 participant LLM as "LLM客户端"
 participant FS as "文件系统"
-Client->>BP : "POST /ai/<id>/build"
-BP->>Svc : "build_wiki_async(app, ai_kb_id, only_pending)"
+Client->>BP : "POST /ai/<ai_kb_id>/build"
+BP->>Svc : "build_wiki_async(app, ai_kb_id : str, only_pending)"
 Svc->>DB : "设置状态 BUILDING"
 loop 遍历待处理源文档
 Svc->>LLM : "chat(系统提示+用户提示)"
@@ -116,12 +125,12 @@ LLM-->>Svc : "JSON结构化输出"
 Svc->>DB : "upsert_article(...)"
 Svc->>FS : "_write_article_file(...)"
 end
-Svc->>Svc : "resolve_links(ai_kb)"
+Svc->>Svc : "resolve_links(ai_kb_id : str)"
 Svc->>DB : "设置状态 READY / 记录错误信息"
 BP-->>Client : "任务已启动"
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [app/services/ai_service.py:313-341](file://app/services/ai_service.py#L313-L341)
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
@@ -153,10 +162,10 @@ class LLMClient {
 }
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 
 ### Wiki构建流程与状态机
@@ -179,11 +188,11 @@ BUILDING --> FAILED : "部分或全部失败"
 READY --> IDLE : "重新构建"
 ```
 
-图表来源
+**图表来源**
 - [app/models/ai_kb.py:8-12](file://app/models/ai_kb.py#L8-L12)
 - [app/models/ai_kb.py:15-19](file://app/models/ai_kb.py#L15-L19)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
@@ -195,10 +204,11 @@ READY --> IDLE : "重新构建"
 - 输入：AIKBSource（绑定知识库与文档）
 - 处理：逐条拉取源文档，抽取纯文本，调用LLM生成草稿，入库与落盘
 - 输出：AIKBArticle（含标题、别名、摘要、标签、正文、来源文档ID列表）
+- **字符串ID处理**：所有操作均基于字符串类型的AI知识库ID进行过滤和查询
 
 ```mermaid
 flowchart TD
-Start(["开始"]) --> LoadSrc["加载源文档"]
+Start(["开始"]) --> LoadSrc["加载源文档 (ai_kb_id: str)"]
 LoadSrc --> Exists{"是否存在且未删除?"}
 Exists -- 否 --> Fail["标记FAILED并记录错误"]
 Exists -- 是 --> Extract["提取纯文本"]
@@ -210,12 +220,12 @@ Next -- 否 --> Done(["结束"])
 Fail --> Done
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
@@ -228,10 +238,11 @@ Fail --> Done
 - 解析器
   - 提供resolver闭包，将[[Target]]映射为slug或None
   - 蓝图层渲染时，将占位锚点替换为实际URL
+- **字符串ID处理**：索引构建和查找均基于字符串类型的AI知识库ID
 
 ```mermaid
 flowchart TD
-Init["清空链接表"] --> BuildIdx["构建标题/别名/slug索引"]
+Init["清空链接表"] --> BuildIdx["构建标题/别名/slug索引 (ai_kb_id: str)"]
 BuildIdx --> Scan["遍历所有文章正文"]
 Scan --> Collect["collect_wikilinks收集目标"]
 Collect --> Lookup{"在索引中找到?"}
@@ -243,12 +254,12 @@ NextArt -- 是 --> Scan
 NextArt -- 否 --> Commit["提交事务"]
 ```
 
-图表来源
+**图表来源**
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 - [app/utils/markdown.py:69-87](file://app/utils/markdown.py#L69-L87)
 - [app/blueprints/ai.py:182-191](file://app/blueprints/ai.py#L182-L191)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 - [app/utils/markdown.py:69-87](file://app/utils/markdown.py#L69-L87)
 - [app/blueprints/ai.py:182-191](file://app/blueprints/ai.py#L182-L191)
@@ -265,7 +276,7 @@ participant BP as "蓝图 : ai.py"
 participant Svc as "服务 : ai_service.py"
 participant DB as "数据库 : ai_kb.py"
 participant LLM as "LLM客户端"
-Client->>BP : "POST /ai/<id>/chat"
+Client->>BP : "POST /ai/<ai_kb_id>/chat"
 BP->>Svc : "chat_with_wiki(ai_kb, question)"
 Svc->>DB : "查询文章列表"
 DB-->>Svc : "文章集合"
@@ -276,13 +287,13 @@ Svc-->>BP : "回答"
 BP-->>Client : "JSON响应"
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
 - [app/models/ai_kb.py:110-121](file://app/models/ai_kb.py#L110-L121)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
 - [app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
@@ -291,6 +302,7 @@ BP-->>Client : "JSON响应"
 ### 增量更新与重生机制
 - 单篇文章重生：根据文章首个源文档重建条目，保持slug不变，更新数据库与文件
 - 全量重建：可选择仅处理待处理/失败的源文档，或重置状态后全量重建
+- **字符串ID处理**：重生操作基于字符串类型的AI知识库ID和文章ID进行定位
 
 ```mermaid
 sequenceDiagram
@@ -300,25 +312,25 @@ participant Svc as "服务 : ai_service.py"
 participant DB as "数据库 : ai_kb.py"
 participant LLM as "LLM客户端"
 participant FS as "文件系统"
-Client->>BP : "POST /ai/<id>/wiki/<slug>/regenerate"
-BP->>Svc : "regenerate_one_async(app, ai_kb_id, article_id)"
+Client->>BP : "POST /ai/<ai_kb_id>/wiki/<slug>/regenerate"
+BP->>Svc : "regenerate_one_async(app, ai_kb_id : str, article_id : str)"
 Svc->>DB : "设置状态 BUILDING"
 Svc->>LLM : "chat(系统提示+用户提示)"
 LLM-->>Svc : "JSON结构化输出"
 Svc->>DB : "更新文章字段"
 Svc->>FS : "_write_article_file(...)"
-Svc->>Svc : "resolve_links(ai_kb)"
+Svc->>Svc : "resolve_links(ai_kb_id : str)"
 Svc->>DB : "设置状态 READY / 记录时间"
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:239-248](file://app/blueprints/ai.py#L239-L248)
 - [app/services/ai_service.py:347-381](file://app/services/ai_service.py#L347-L381)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:204-230](file://app/services/ai_service.py#L204-L230)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:239-248](file://app/blueprints/ai.py#L239-L248)
 - [app/services/ai_service.py:347-381](file://app/services/ai_service.py#L347-L381)
 
@@ -326,21 +338,22 @@ Svc->>DB : "设置状态 READY / 记录时间"
 - 权限控制：仅知识库拥有者或超级管理员可操作AI知识库
 - 状态查询：提供JSON接口返回知识库状态、错误、最后构建时间、源文档计数与文章数量
 - 中间件：登录、CSRF、数据库扩展在应用工厂中注册
+- **字符串ID处理**：蓝图路由参数均为字符串类型，确保与服务层的一致性
 
 ```mermaid
 graph LR
 A["蓝图: ai.py"] --> B["权限校验: 仅拥有者/超级管理员"]
-A --> C["状态查询: /ai/<id>/status -> JSON"]
+A --> C["状态查询: /ai/<ai_kb_id>/status -> JSON"]
 A --> D["中间件: 登录/CSRF/数据库"]
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/ai.py:18-25](file://app/blueprints/ai.py#L18-L25)
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - [app/__init__.py:39-54](file://app/__init__.py#L39-L54)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:18-25](file://app/blueprints/ai.py#L18-L25)
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - [app/__init__.py:39-54](file://app/__init__.py#L39-L54)
@@ -350,6 +363,7 @@ A --> D["中间件: 登录/CSRF/数据库"]
 - 运行时依赖：Flask、SQLAlchemy、OpenAI SDK、python-slugify、markdown、bleach等
 - 可选依赖：当启用RAG时需要chromadb与tiktoken（见配置与注释）
 - 服务层与蓝图层解耦：蓝图仅负责路由与权限，业务逻辑集中在服务层
+- **ID生成工具**：使用app/utils/ids.py提供的短URL友好ID生成器，确保跨层ID一致性
 
 ```mermaid
 graph TB
@@ -361,14 +375,17 @@ REQ --> MD["markdown"]
 REQ --> BL["bleach"]
 REQ -. 可选 .-> CHROMA["chromadb"]
 REQ -. 可选 .-> TIK["tiktoken"]
+ID_GEN["app/utils/ids.py"] --> MODELS["app/models/ai_kb.py"]
 ```
 
-图表来源
+**图表来源**
 - [requirements.txt:1-21](file://requirements.txt#L1-L21)
+- [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)
 
-章节来源
+**章节来源**
 - [requirements.txt:1-21](file://requirements.txt#L1-L21)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
+- [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 
 ## 性能考虑
 - 文本截断与安全上限：对源文档纯文本进行长度限制，降低LLM输入成本与风险
@@ -377,8 +394,9 @@ REQ -. 可选 .-> TIK["tiktoken"]
 - 索引去重：wikilink解析前构建大小写不敏感索引，减少重复计算
 - 并发与后台任务：使用后台线程执行构建，避免阻塞请求；失败不影响其他任务
 - 可选RAG：仅在enable_rag开启时引入向量化与Chroma存储，按需启用
+- **字符串ID优化**：统一的字符串ID类型减少了类型转换开销，提高了查询效率
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:62-70](file://app/services/ai_service.py#L62-L70)
 - [app/services/ai_service.py:196-202](file://app/services/ai_service.py#L196-L202)
@@ -407,17 +425,24 @@ REQ -. 可选 .-> TIK["tiktoken"]
   - 现象：启用RAG后仍为纯文本问答
   - 处理：安装chromadb与tiktoken，配置EMBEDDING_MODEL与CHROMA_PATH
   - 参考路径：[requirements.txt:19-21](file://requirements.txt#L19-L21)，[app/config.py:44-47](file://app/config.py#L44-L47)
+- **字符串ID类型错误**
+  - 现象：服务函数调用时报类型错误
+  - 处理：确保传递字符串类型的AI知识库ID，不要使用整数ID
+  - 参考路径：[app/services/ai_service.py:313](file://app/services/ai_service.py#L313)
 
-章节来源
+**章节来源**
 - [app/services/ai_service.py:67-69](file://app/services/ai_service.py#L67-L69)
 - [app/services/ai_service.py:302-303](file://app/services/ai_service.py#L302-L303)
 - [app/services/ai_service.py:251-278](file://app/services/ai_service.py#L251-L278)
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [requirements.txt:19-21](file://requirements.txt#L19-L21)
 - [app/config.py:44-47](file://app/config.py#L44-L47)
+- [app/services/ai_service.py:313](file://app/services/ai_service.py#L313)
 
 ## 结论
 本服务层以Karpathy LLM Wiki方法为核心，结合可选RAG增强，提供了从源文档到可导航知识图谱的完整链路。通过清晰的状态机、健壮的错误恢复、可扩展的LLM封装与后台异步任务，既满足纯文本知识库场景，也为未来向量检索与大规模扩展打下基础。蓝图层与服务层职责分离，便于维护与演进。
+
+**更新** 服务层现已全面采用字符串ID处理模式，确保了与模型层的完全一致性和类型安全性，为系统的稳定性和可维护性提供了重要保障。
 
 ## 附录
 
@@ -425,31 +450,33 @@ REQ -. 可选 .-> TIK["tiktoken"]
 - 获取状态
   - 方法：GET
   - 路径：/ai/<ai_kb_id>/status
+  - 参数：ai_kb_id（字符串类型）
   - 返回：JSON，包含status、error、last_built_at、sources计数、articles数量
   - 权限：登录用户
   - 参考路径：[app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - 启动构建
   - 方法：POST
   - 路径：/ai/<ai_kb_id>/build
-  - 参数：scope（默认仅待处理，传all则重置为PENDING后全量）
+  - 参数：ai_kb_id（字符串类型），scope（默认仅待处理，传all则重置为PENDING后全量）
   - 返回：重定向至详情页
   - 权限：登录用户（拥有者或超级管理员）
   - 参考路径：[app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - 文章重生
   - 方法：POST
   - 路径：/ai/<ai_kb_id>/wiki/<slug>/regenerate
+  - 参数：ai_kb_id（字符串类型），slug（字符串类型）
   - 返回：重定向至文章详情
   - 权限：登录用户（拥有者或超级管理员）
   - 参考路径：[app/blueprints/ai.py:239-248](file://app/blueprints/ai.py#L239-L248)
 - 聊天问答（可选）
   - 方法：GET/POST
   - 路径：/ai/<ai_kb_id>/chat
-  - POST参数：q（问题）
+  - 参数：ai_kb_id（字符串类型），POST参数：q（问题）
   - 返回：JSON，包含ok与answer或error
   - 权限：登录用户
   - 参考路径：[app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:159-173](file://app/blueprints/ai.py#L159-L173)
 - [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
 - [app/blueprints/ai.py:239-248](file://app/blueprints/ai.py#L239-L248)
@@ -471,14 +498,14 @@ string error_msg
 }
 AI_KB_SOURCES {
 int id PK
-int ai_kb_id FK
+string ai_kb_id FK
 int doc_id FK
 string status
 string err_msg
 }
 AI_KB_ARTICLES {
 int id PK
-int ai_kb_id FK
+string ai_kb_id FK
 string title
 string slug UK
 string summary
@@ -489,14 +516,14 @@ text source_doc_ids_json
 }
 AI_KB_LINKS {
 int id PK
-int ai_kb_id FK
+string ai_kb_id FK
 int from_article_id FK
 int to_article_id FK
 string anchor_text
 }
 AI_KB_CHUNKS {
 int id PK
-int ai_kb_id FK
+string ai_kb_id FK
 int article_id FK
 int chunk_idx
 text content
@@ -509,9 +536,22 @@ AI_KNOWLEDGE_BASES ||--o{ AI_KB_CHUNKS : "包含"
 AI_KB_ARTICLES ||--o{ AI_KB_CHUNKS : "包含"
 ```
 
-图表来源
+**图表来源**
 - [app/models/ai_kb.py:22-44](file://app/models/ai_kb.py#L22-L44)
 - [app/models/ai_kb.py:46-64](file://app/models/ai_kb.py#L46-L64)
 - [app/models/ai_kb.py:66-91](file://app/models/ai_kb.py#L66-L91)
 - [app/models/ai_kb.py:93-108](file://app/models/ai_kb.py#L93-L108)
 - [app/models/ai_kb.py:110-121](file://app/models/ai_kb.py#L110-L121)
+
+### 字符串ID处理最佳实践
+- **类型一致性**：所有服务函数必须接收字符串类型的AI知识库ID参数
+- **参数验证**：在服务层入口处验证ID格式，确保非空且符合预期格式
+- **错误处理**：对无效ID进行明确的错误处理和用户反馈
+- **日志记录**：记录ID处理过程中的关键信息，便于调试和监控
+
+**章节来源**
+- [app/services/ai_service.py:163](file://app/services/ai_service.py#L163)
+- [app/services/ai_service.py:236](file://app/services/ai_service.py#L236)
+- [app/services/ai_service.py:280](file://app/services/ai_service.py#L280)
+- [app/services/ai_service.py:312](file://app/services/ai_service.py#L312)
+- [app/services/ai_service.py:346](file://app/services/ai_service.py#L346)

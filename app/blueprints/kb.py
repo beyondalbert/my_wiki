@@ -1,5 +1,5 @@
 """Knowledge Base blueprint."""
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, url_for
+from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
 from flask_login import login_required, current_user
 
 from ..extensions import db
@@ -58,6 +58,8 @@ def detail(kb_id):
     kb = _get_kb_or_404(kb_id)
     if not kb_service.can_access(current_user, kb):
         abort(403)
+    if kb_service.requires_unlock(current_user, kb, session):
+        return redirect(url_for("kb.unlock", kb_id=kb.id, next=request.path))
     tree = doc_service.list_kb_doc_tree(kb.id)
     # Default open first doc if any
     first_doc = (
@@ -85,10 +87,38 @@ def edit_kb(kb_id):
         if v in {x.value for x in KBVisibility}:
             kb.visibility = v
         kb.icon = request.form.get("icon") or kb.icon
+        # 访问密码：仅公开知识库生效
+        if kb.is_public:
+            new_pwd = (request.form.get("access_password") or "").strip()
+            if request.form.get("clear_access_password") == "1":
+                kb.set_access_password(None)
+            elif new_pwd:
+                kb.set_access_password(new_pwd)
+        else:
+            # 非公开 → 自动清除旧密码，避免后续转回 public 时遗留
+            kb.set_access_password(None)
         db.session.commit()
         flash("已保存", "success")
         return redirect(url_for("kb.detail", kb_id=kb.id))
     return render_template("kb/edit.html", kb=kb)
+
+
+@bp.route("/<kb_id>/unlock", methods=["GET", "POST"])
+def unlock(kb_id):
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_access(current_user, kb):
+        abort(403)
+    # 已豁免或未设密码 → 直接跳回
+    if not kb_service.requires_unlock(current_user, kb, session):
+        return redirect(url_for("kb.detail", kb_id=kb.id))
+    next_url = request.args.get("next") or url_for("kb.detail", kb_id=kb.id)
+    if request.method == "POST":
+        password = (request.form.get("password") or "").strip()
+        if kb.check_access_password(password) and password:
+            kb_service.mark_unlocked(session, kb)
+            return redirect(next_url)
+        flash("访问密码错误", "error")
+    return render_template("kb/unlock.html", kb=kb, next_url=next_url)
 
 
 @bp.route("/<kb_id>/delete", methods=["POST"])

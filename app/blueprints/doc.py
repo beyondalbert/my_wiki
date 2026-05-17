@@ -1,10 +1,15 @@
 """Document blueprint."""
-from flask import Blueprint, abort, flash, jsonify, redirect, render_template, request, session, url_for
-from flask_login import login_required, current_user
+import os
+from pathlib import Path
 
-from ..extensions import db
+from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, send_from_directory, session, url_for
+from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
+
+from ..extensions import csrf, db
 from ..models import Document, KnowledgeBase, DocumentPrivacy, DocumentType, DocumentShare
 from ..services import kb_service, doc_service, share_service
+from ..utils.ids import generate_id
 from ..utils.outline import extract_outline
 
 bp = Blueprint("doc", __name__)
@@ -15,6 +20,38 @@ def _get_doc_or_404(doc_id: str) -> Document:
     if doc is None or doc.is_deleted:
         abort(404)
     return doc
+
+
+_ALLOWED_IMAGE_EXTS = {"png", "jpg", "jpeg", "gif", "webp", "svg"}
+
+
+@bp.route("/upload-image", methods=["POST"])
+@csrf.exempt          # AJAX FormData 上传，login_required 已提供保护
+@login_required
+def upload_image():
+    """接收编辑器上传的图片，保存到 UPLOAD_DIR/images/ 并返回可访问 URL。"""
+    file = request.files.get("image")
+    if not file or not file.filename:
+        return jsonify({"error": "未选择文件"}), 400
+    ext = (file.filename.rsplit(".", 1)[-1] if "." in file.filename else "").lower()
+    if ext not in _ALLOWED_IMAGE_EXTS:
+        return jsonify({"error": f"不支持的图片格式（仅 {', '.join(sorted(_ALLOWED_IMAGE_EXTS))}）"}), 400
+    filename = f"{generate_id(16)}.{ext}"
+    upload_dir = Path(current_app.config["UPLOAD_DIR"]) / "images"
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file.save(str(upload_dir / filename))
+    url = url_for("doc.uploaded_image", filename=filename)
+    return jsonify({"url": url})
+
+
+@bp.route("/uploads/images/<filename>")
+def uploaded_image(filename):
+    """Serve 上传的图片文件。"""
+    upload_dir = Path(current_app.config["UPLOAD_DIR"]) / "images"
+    safe_name = secure_filename(filename)
+    if not safe_name or not (upload_dir / safe_name).is_file():
+        abort(404)
+    return send_from_directory(str(upload_dir), safe_name)
 
 
 @bp.route("/new", methods=["POST"])

@@ -61,6 +61,7 @@
 <script>
 (function () {
   const SAVE_URL = "{{ url_for('doc.save', doc_id=doc.id) }}";
+  const UPLOAD_IMAGE_URL = "{{ url_for('doc.upload_image') }}";
   const IS_SHEET = {{ 'true' if is_sheet else 'false' }};
   const status = document.getElementById('save-status');
   const errBox = document.getElementById('editor-error');
@@ -124,6 +125,25 @@
         initialValue: typeof initialRaw === 'string' ? initialRaw : '',
         placeholder: '在此开始书写… 上方工具栏可一键插入标题/列表/表格/代码块',
         events: { change: () => markDirty() },
+        hooks: {
+          addImageBlobHook: function (blob, callback) {
+            var form = new FormData();
+            form.append('image', blob);
+            fetch(UPLOAD_IMAGE_URL, { method: 'POST', body: form })
+              .then(function (r) { return r.json(); })
+              .then(function (data) {
+                if (data.url) {
+                  callback(data.url, blob.name || 'image');
+                } else {
+                  alert(data.error || '图片上传失败');
+                }
+              })
+              .catch(function (e) {
+                console.error('图片上传异常', e);
+                alert('图片上传失败，请检查网络');
+              });
+          }
+        },
       });
     } catch (e) {
       showError('Toast UI Editor 创建失败: ' + (e && e.message || e));

@@ -31,7 +31,8 @@ class BaseConfig:
     REMEMBER_COOKIE_DURATION = 60 * 60 * 24 * 7
 
     # Upload
-    UPLOAD_DIR = os.getenv("UPLOAD_DIR", str(BASE_DIR / "instance" / "uploads"))
+    _upload_raw = os.getenv("UPLOAD_DIR", str(BASE_DIR / "instance" / "uploads"))
+    UPLOAD_DIR = str(Path(_upload_raw).resolve()) if os.path.isabs(_upload_raw) else str((BASE_DIR / _upload_raw).resolve())
     MAX_CONTENT_LENGTH = int(os.getenv("MAX_CONTENT_LENGTH", str(32 * 1024 * 1024)))
 
     # AI

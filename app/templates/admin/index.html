@@ -24,6 +24,7 @@
       ('管理员', url_for('admin.admins'), '提升 / 撤销系统管理员', 'rose'),
       ('公开知识库', url_for('admin.public_kbs'), '审核与下架公开知识库', 'sky'),
       ('公开文档', url_for('admin.public_docs'), '巡查公开文档', 'amber'),
+      ('AI / 大模型配置', url_for('admin.settings'), '配置 API 地址、密钥、模型名称', 'indigo'),
     ] %}
       <a href="{{ href }}" class="block bg-white border border-slate-200 hover:border-{{ color }}-300 hover:shadow rounded-xl p-5 transition">
         <div class="font-semibold text-slate-800">{{ label }}</div>

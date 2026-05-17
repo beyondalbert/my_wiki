@@ -2,6 +2,7 @@
 from .user import User, Role, Permission, RolePermission, UserRole
 from .knowledge_base import KnowledgeBase, KBMember, KBVisibility, KBMemberRole
 from .document import Document, DocumentShare, DocumentType, DocumentPrivacy
+from .system_config import SystemConfig
 from .ai_kb import (
     AIKnowledgeBase,
     AIKBSource,
@@ -27,6 +28,7 @@ __all__ = [
     "DocumentShare",
     "DocumentType",
     "DocumentPrivacy",
+    "SystemConfig",
     "AIKnowledgeBase",
     "AIKBSource",
     "AIKBArticle",

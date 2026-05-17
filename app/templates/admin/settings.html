@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}AI / 大模型配置 · {{ site_name }}{% endblock %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-10">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-bold text-slate-800">AI / 大模型配置</h1>
+      <p class="text-sm text-slate-500 mt-1">修改后立即生效，无需重启服务</p>
+    </div>
+    <a href="{{ url_for('admin.index') }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回控制台</a>
+  </div>
+
+  <form method="post" class="bg-white border border-slate-200 rounded-2xl p-6 space-y-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+
+    {% for item in config_keys %}
+      {% set val = current_vals.get(item.key, '') %}
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">{{ item.label }}</label>
+
+        {% if item.type == 'toggle' %}
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" name="{{ item.key }}" value="1"
+                   {{ 'checked' if val in ('true','1','yes','on') }}
+                   class="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+            <span class="text-sm text-slate-600">{{ '已启用' if val in ('true','1','yes','on') else '未启用' }}</span>
+          </label>
+
+        {% elif item.type == 'password' %}
+          <input name="{{ item.key }}" type="password"
+                 placeholder="{{ '••••••••（已设置，留空不修改）' if val else item.placeholder }}"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+          {% if val %}
+            <p class="text-xs text-slate-400 mt-1">当前值：{{ val[:8] }}{{ '••••' if val|length > 8 else '' }}</p>
+          {% endif %}
+
+        {% else %}
+          <input name="{{ item.key }}" type="text" value="{{ val }}"
+                 placeholder="{{ item.placeholder }}"
+                 class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none" />
+        {% endif %}
+      </div>
+    {% endfor %}
+
+    <div class="border-t border-slate-100 pt-4">
+      <button type="submit"
+              class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg font-medium">
+        保存配置
+      </button>
+      <span class="ml-3 text-xs text-slate-400">保存后无需重启，新请求将使用最新值</span>
+    </div>
+  </form>
+
+  <div class="mt-6 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-600 space-y-2">
+    <p class="font-medium text-slate-700">配置说明</p>
+    <ul class="list-disc list-inside space-y-1">
+      <li><strong>API 接口地址</strong>：支持 OpenAI 兼容格式（如 DeepSeek、通义千问、本地代理等）</li>
+      <li><strong>API 密钥</strong>：对应 API Key，保存后仅显示前 8 位</li>
+      <li><strong>对话模型</strong>：用于 AI 知识库文章改写的模型名称</li>
+      <li><strong>嵌入模型</strong>：启用 RAG 时使用的向量嵌入模型</li>
+      <li><strong>启用向量检索</strong>：开启后 AI 知识库可使用语义搜索增强（需额外依赖 chromadb）</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

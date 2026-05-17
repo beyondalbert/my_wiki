@@ -49,14 +49,17 @@ class LLMClient:
 
     ``base_url`` and ``api_key`` come from app config so any compatible vendor
     works (OpenAI / DeepSeek / Tongyi / local proxy).
+
+    Priority: explicit param > DB system_config > app.config > default.
     """
 
     def __init__(self, base_url: str | None = None, api_key: str | None = None,
                  model: str | None = None):
+        from . import config_service  # avoid circular import
         cfg = current_app.config
-        self.base_url = base_url or cfg.get("OPENAI_BASE_URL")
-        self.api_key = api_key or cfg.get("OPENAI_API_KEY")
-        self.model = model or cfg.get("CHAT_MODEL") or "gpt-4o-mini"
+        self.base_url = base_url or config_service.get("OPENAI_BASE_URL") or cfg.get("OPENAI_BASE_URL")
+        self.api_key = api_key or config_service.get("OPENAI_API_KEY") or cfg.get("OPENAI_API_KEY")
+        self.model = model or config_service.get("CHAT_MODEL") or cfg.get("CHAT_MODEL") or "gpt-4o-mini"
         self._client = None
 
     @property

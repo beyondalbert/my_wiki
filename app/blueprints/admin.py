@@ -7,6 +7,7 @@ from ..models import (
     User, Role, Permission, KnowledgeBase, KBVisibility,
     Document, DocumentPrivacy,
 )
+from ..services import config_service
 from ..utils.pagination import get_page_args
 
 bp = Blueprint("admin", __name__)
@@ -261,3 +262,26 @@ def takedown_doc(doc_id):
     db.session.commit()
     flash("已下架（设为私密）", "info")
     return redirect(url_for("admin.public_docs"))
+
+
+# ---------- System Settings (AI / LLM) ----------
+
+@bp.route("/settings", methods=["GET", "POST"])
+def settings():
+    if request.method == "POST":
+        for item in config_service.AI_CONFIG_KEYS:
+            key = item["key"]
+            if item["type"] == "toggle":
+                val = "true" if request.form.get(key) == "1" else "false"
+            else:
+                val = (request.form.get(key) or "").strip()
+                # 密码类型：如果前端提交为空（未修改 placeholder），保留旧值
+                if item["type"] == "password" and not val:
+                    continue
+            config_service.set_config(key, val, description=item["label"])
+        flash("配置已保存，立即生效", "success")
+        return redirect(url_for("admin.settings"))
+    current_vals = config_service.get_all()
+    return render_template("admin/settings.html",
+                           config_keys=config_service.AI_CONFIG_KEYS,
+                           current_vals=current_vals)

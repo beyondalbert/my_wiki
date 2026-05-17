@@ -131,6 +131,53 @@ def delete_role(role_id):
     return redirect(url_for("admin.roles"))
 
 
+@bp.route("/roles/<int:role_id>/edit", methods=["POST"])
+def edit_role(role_id):
+    role = db.session.get(Role, role_id)
+    if not role:
+        abort(404)
+    if role.is_system:
+        flash("内置角色不可修改", "warning")
+        return redirect(url_for("admin.roles"))
+    name = (request.form.get("name") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not name:
+        flash("角色名称不能为空", "error")
+        return redirect(url_for("admin.roles"))
+    role.name = name
+    role.description = description
+    db.session.commit()
+    flash("角色已更新", "success")
+    return redirect(url_for("admin.roles"))
+
+
+@bp.route("/permissions", methods=["POST"])
+def new_permission():
+    code = (request.form.get("code") or "").strip()
+    name = (request.form.get("name") or "").strip()
+    description = (request.form.get("description") or "").strip()
+    if not code or not name:
+        flash("权限 code 和名称不能为空", "error")
+    elif Permission.query.filter_by(code=code).first():
+        flash("权限 code 已存在", "warning")
+    else:
+        db.session.add(Permission(code=code, name=name, description=description))
+        db.session.commit()
+        flash("已新增权限项", "success")
+    return redirect(url_for("admin.roles"))
+
+
+@bp.route("/permissions/<int:perm_id>/delete", methods=["POST"])
+def delete_permission(perm_id):
+    perm = db.session.get(Permission, perm_id)
+    if not perm:
+        abort(404)
+    db.session.delete(perm)
+    db.session.commit()
+    flash("权限项已删除", "info")
+    return redirect(url_for("admin.roles"))
+
+
 # ---------- Admins ----------
 
 @bp.route("/admins")

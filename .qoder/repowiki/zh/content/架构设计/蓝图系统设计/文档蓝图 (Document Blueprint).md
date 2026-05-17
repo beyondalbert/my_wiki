@@ -15,7 +15,18 @@
 - [run.py](file://run.py)
 - [requirements.txt](file://requirements.txt)
 - [app/config.py](file://app/config.py)
+- [app/templates/doc/edit.html](file://app/templates/doc/edit.html)
+- [app/templates/doc/view.html](file://app/templates/doc/view.html)
+- [scripts/fetch_vendors.py](file://scripts/fetch_vendors.py)
 </cite>
+
+## 更新摘要
+**所做更改**
+- 更新了编辑器实现部分，反映从Editor.js到Toast UI Editor的完全替换
+- 更新了内容存储格式，从Editor.js JSON迁移到Markdown格式
+- 新增了JavaScript初始化代码和错误处理机制的详细说明
+- 更新了文档树结构管理和内容处理流程
+- 增强了前端编辑器集成和后端内容存储的说明
 
 ## 目录
 1. [简介](#简介)
@@ -34,7 +45,7 @@
 
 ### 主要特性
 
-- **富文本编辑器集成**：使用 Editor.js 提供直观的可视化编辑体验
+- **富文本编辑器集成**：使用 Toast UI Editor 提供直观的可视化编辑体验
 - **多格式内容管理**：支持文档和电子表格两种内容类型
 - **智能文档树结构**：基于父子关系的层次化文档组织
 - **内容安全过滤**：内置 HTML 和 Markdown 内容安全机制
@@ -151,79 +162,73 @@ USER ||--o{ DOCUMENT_SHARE : created_by
 
 ### 编辑器内容处理
 
-系统采用 Editor.js JSON 格式存储富文本内容，并提供多种内容转换和提取功能：
+**更新** 系统现已采用 Toast UI Editor 替代原有的 Editor.js，内容存储格式从 Editor.js JSON 迁移到 Markdown 格式：
 
 ```mermaid
 flowchart TD
-A[Editor.js JSON输入] --> B[解析块内容]
-B --> C{块类型判断}
-C --> |header| D[提取标题内容]
-C --> |paragraph| E[提取段落文本]
-C --> |list| F[提取列表项]
-C --> |checklist| G[提取复选框项]
-C --> |code| H[提取代码块]
-C --> |table| I[提取表格数据]
-C --> |quote| J[提取引用内容]
-C --> |image| K[提取图片信息]
-D --> L[生成大纲]
-E --> M[生成纯文本]
-F --> M
-G --> M
-H --> M
-I --> M
-J --> M
-K --> M
-L --> N[大纲输出]
-M --> O[搜索索引]
+A[Toast UI Editor 初始化] --> B[获取Markdown内容]
+B --> C{内容类型判断}
+C --> |Markdown| D[直接存储Markdown]
+C --> |编辑器事件| E[实时状态更新]
+D --> F[生成大纲]
+D --> G[生成纯文本索引]
+E --> H[保存状态提示]
+F --> I[大纲输出]
+G --> J[搜索索引]
+H --> K[用户反馈]
 ```
 
 **图表来源**
-- [app/utils/outline.py:22-55](file://app/utils/outline.py#L22-L55)
-- [app/utils/outline.py:58-87](file://app/utils/outline.py#L58-L87)
+- [app/templates/doc/edit.html:75-96](file://app/templates/doc/edit.html#L75-L96)
+- [app/templates/doc/view.html:86-92](file://app/templates/doc/view.html#L86-L92)
 
 **章节来源**
 - [app/models/document.py:10-18](file://app/models/document.py#L10-L18)
-- [app/utils/outline.py:1-136](file://app/utils/outline.py#L1-L136)
+- [app/utils/outline.py:1-143](file://app/utils/outline.py#L1-L143)
 
 ## 架构概览
 
 ### 整体系统架构
 
+**更新** 系统架构已完全适配新的编辑器实现：
+
 ```mermaid
 graph TB
 subgraph "前端层"
 A[Web界面]
-B[Editor.js编辑器]
+B[Toast UI Editor]
 C[Markdown渲染器]
+D[错误处理机制]
 end
 subgraph "应用层"
-D[Flask应用工厂]
-E[蓝图路由]
-F[会话管理]
+E[Flask应用工厂]
+F[蓝图路由]
+G[会话管理]
 end
 subgraph "服务层"
-G[文档服务]
-H[知识库服务]
-I[分享服务]
-J[安全服务]
+H[文档服务]
+I[知识库服务]
+J[分享服务]
+K[安全服务]
 end
 subgraph "数据层"
-K[SQLAlchemy ORM]
-L[MySQL数据库]
-M[文件存储]
+L[SQLAlchemy ORM]
+M[MySQL数据库]
+N[文件存储]
 end
-A --> D
-B --> G
-C --> J
+A --> E
+B --> H
+C --> K
 D --> E
-E --> G
-G --> H
-G --> I
-H --> K
-I --> K
-J --> K
+E --> F
+F --> H
+H --> I
+H --> J
+I --> L
+J --> L
 K --> L
-K --> M
+L --> M
+L --> N
 ```
 
 **图表来源**
@@ -231,6 +236,8 @@ K --> M
 - [app/blueprints/doc.py:1-10](file://app/blueprints/doc.py#L1-L10)
 
 ### 请求处理流程
+
+**更新** 请求处理流程已适配新的编辑器实现：
 
 ```mermaid
 sequenceDiagram
@@ -249,7 +256,7 @@ B-->>U : 重定向到编辑页面
 U->>A : POST /doc/save
 A->>B : save()
 B->>S : update_content()
-S->>DB : 更新内容和元数据
+S->>DB : 更新Markdown内容和元数据
 DB-->>S : 确认更新
 S-->>B : 返回成功响应
 B-->>U : JSON响应包含大纲和时间戳
@@ -267,9 +274,9 @@ B-->>U : JSON响应包含大纲和时间戳
 
 ### 文档编辑器组件
 
-#### 富文本编辑实现
+#### Toast UI Editor 实现
 
-系统采用 Editor.js 作为富文本编辑器，通过 JSON 格式存储复杂的内容结构：
+**更新** 系统现已完全采用 Toast UI Editor 作为富文本编辑器：
 
 ```mermaid
 classDiagram
@@ -296,7 +303,6 @@ class DocumentService {
 +soft_delete(doc) void
 }
 class OutlineExtractor {
-+parse_editor_blocks(content_json) list
 +extract_outline(content_json) list
 +extract_plain_text(content_json) string
 +extract_markdown(content_json) string
@@ -527,6 +533,8 @@ end
 
 ### 内部模块依赖
 
+**更新** 内部模块依赖已适配新的编辑器实现：
+
 ```mermaid
 graph LR
 A[app/__init__.py] --> B[app/blueprints/doc.py]
@@ -539,6 +547,8 @@ D --> E
 D --> G[app/models/knowledge_base.py]
 H[app/utils/markdown.py] --> I[app/utils/security.py]
 H --> J[第三方库]
+K[app/templates/doc/edit.html] --> L[app/static/vendor/js/toastui-editor-all.min.js]
+M[app/templates/doc/view.html] --> L
 ```
 
 **图表来源**
@@ -564,7 +574,7 @@ H --> J[第三方库]
 
 虽然当前实现没有显式的缓存层，但系统设计时考虑了缓存的可能性：
 
-- **内容预处理**：将 Editor.js JSON 转换为纯文本用于搜索
+- **内容预处理**：将 Markdown 转换为纯文本用于搜索
 - **大纲提取**：预先计算文档大纲以减少重复计算
 - **模板渲染**：使用 Flask 的模板缓存机制
 
@@ -588,11 +598,13 @@ H --> J[第三方库]
 1. 权限不足（非文档编辑者）
 2. 内容格式不正确
 3. 数据库连接问题
+4. **编辑器初始化失败**
 
 **解决步骤**：
 1. 检查用户权限：确认用户是否具有编辑权限
-2. 验证内容格式：确保 Editor.js JSON 格式正确
+2. 验证内容格式：确保 Markdown 格式正确
 3. 检查数据库状态：确认数据库连接正常
+4. **检查编辑器加载**：确认 toastui-editor-all.min.js 正常加载
 
 #### 文档树显示异常
 
@@ -622,30 +634,49 @@ H --> J[第三方库]
 2. 验证密码输入
 3. 确认文档仍处于可分享状态
 
+#### **编辑器加载失败**
+
+**新增** **症状**：编辑器无法正常加载或显示空白
+
+**可能原因**：
+1. **Toast UI Editor 资源加载失败**
+2. **JavaScript初始化错误**
+3. **浏览器兼容性问题**
+
+**解决步骤**：
+1. **检查网络面板**：确认 toastui-editor-all.min.js 返回 200 OK
+2. **验证初始化代码**：检查编辑器初始化参数
+3. **测试浏览器兼容性**：确认支持现代浏览器
+4. **查看控制台错误**：定位具体的JavaScript错误
+
 **章节来源**
 - [app/blueprints/doc.py:13-17](file://app/blueprints/doc.py#L13-L17)
 - [app/services/share_service.py:39-43](file://app/services/share_service.py#L39-L43)
 
 ### 错误处理机制
 
-系统实现了完善的错误处理机制：
+**更新** 系统实现了完善的错误处理机制，包括新的编辑器错误处理：
 
 ```mermaid
 flowchart TD
 A[异常发生] --> B{异常类型判断}
 B --> |404| C[文档不存在]
 B --> |403| D[权限不足]
-B --> |其他| E[服务器错误]
-C --> F[返回404页面]
-D --> G[返回403页面]
-E --> H[返回500页面]
-F --> I[日志记录]
-G --> I
-H --> I
+B --> |编辑器错误| E[Toast UI Editor错误]
+B --> |其他| F[服务器错误]
+C --> G[返回404页面]
+D --> H[返回403页面]
+E --> I[显示错误提示]
+F --> J[返回500页面]
+G --> K[日志记录]
+H --> K
+I --> K
+J --> K
 ```
 
 **图表来源**
 - [app/__init__.py:76-87](file://app/__init__.py#L76-L87)
+- [app/templates/doc/edit.html:54-68](file://app/templates/doc/edit.html#L54-L68)
 
 ## 结论
 
@@ -657,6 +688,7 @@ H --> I
 2. **安全可靠**：多重安全机制保护用户数据
 3. **性能优化**：合理的数据库设计和查询优化
 4. **用户体验**：直观的编辑器和流畅的操作体验
+5. **现代化技术栈**：采用 Toast UI Editor 提供更好的编辑体验
 
 ### 发展建议
 
@@ -664,5 +696,6 @@ H --> I
 2. **搜索功能**：集成全文搜索引擎提升检索效率
 3. **版本历史**：实现更精细的版本控制和比较功能
 4. **移动端适配**：优化移动端用户体验
+5. **编辑器功能扩展**：利用 Toast UI Editor 的更多特性
 
 该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。

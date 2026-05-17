@@ -19,7 +19,7 @@
             <td class="px-4 py-2 text-slate-500">{{ u.email }}</td>
             <td class="px-4 py-2"><span class="text-xs px-2 py-0.5 rounded-full bg-rose-50 text-rose-700">超级管理员</span></td>
             <td class="px-4 py-2 text-right">
-              <form method="post" action="{{ url_for('admin.demote_admin', user_id=u.id) }}" class="inline"
+              <form method="post" action="{{ url_for('admin.revoke_admin', user_id=u.id) }}" class="inline"
                     onsubmit="return confirm('撤销 {{ u.username }} 的超管身份？')">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                 <button class="text-rose-600 hover:underline">撤销</button>

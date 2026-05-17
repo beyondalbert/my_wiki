@@ -1,44 +1,172 @@
 {% extends "base.html" %}
 {% block title %}角色与权限 · 超管{% endblock %}
 {% block content %}
-<div class="max-w-6xl mx-auto px-4 py-8">
+<div class="max-w-7xl mx-auto px-4 py-8">
   <div class="flex items-center justify-between mb-6">
     <h1 class="text-2xl font-bold text-slate-800">角色与权限</h1>
     <a href="{{ url_for('admin.index') }}" class="text-sm text-slate-500 hover:text-indigo-600">← 返回控制台</a>
   </div>
+
   <div class="grid lg:grid-cols-2 gap-6">
-    <div class="bg-white border border-slate-200 rounded-xl p-5">
-      <h2 class="font-semibold text-slate-800 mb-3">角色</h2>
-      <ul class="divide-y divide-slate-100">
-        {% for r in roles %}
-          <li class="py-3">
-            <div class="flex items-center justify-between">
-              <div>
-                <div class="font-medium text-slate-800">{{ r.name }} <span class="text-xs text-slate-400">({{ r.code }})</span></div>
-                <div class="text-xs text-slate-500 mt-1">{{ r.description or '—' }}</div>
+
+    {# ============ 左栏：角色管理 ============ #}
+    <div class="space-y-6">
+      {# 新增角色 #}
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">+ 新增角色</h2>
+        <form method="post" action="{{ url_for('admin.roles') }}" class="grid sm:grid-cols-2 gap-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input name="code" placeholder="code（如 editor）" required
+                 class="px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none" />
+          <input name="name" placeholder="名称（如 编辑）" required
+                 class="px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none" />
+          <input name="description" placeholder="描述（可选）"
+                 class="sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none" />
+          <button type="submit"
+                  class="sm:col-span-2 px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded font-medium">
+            创建角色
+          </button>
+        </form>
+      </div>
+
+      {# 角色列表 + 编辑 + 分配权限 + 删除 #}
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">角色列表（{{ roles|length }}）</h2>
+        <ul class="space-y-4">
+          {% for r in roles %}
+            <li x-data="{ open: false }" class="border border-slate-100 rounded-lg p-4">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <span class="font-medium text-slate-800">{{ r.name }}</span>
+                    <code class="text-xs px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded">{{ r.code }}</code>
+                    {% if r.is_system %}
+                      <span class="text-xs px-2 py-0.5 rounded-full"
+                            style="background-color:#fef3c7; color:#b45309;">内置</span>
+                    {% endif %}
+                  </div>
+                  <div class="text-xs text-slate-500 mt-1">{{ r.description or '—' }}</div>
+                  <div class="mt-2 flex flex-wrap gap-1">
+                    {% for p in r.permissions %}
+                      <span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded" title="{{ p.code }}">{{ p.name }}</span>
+                    {% else %}
+                      <span class="text-xs text-slate-400">未分配权限</span>
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="flex flex-col gap-1 shrink-0">
+                  <button @click="open = !open" type="button"
+                          class="text-xs px-2 py-1 border border-slate-300 rounded hover:bg-slate-50">
+                    <span x-text="open ? '收起' : '管理'"></span>
+                  </button>
+                  {% if not r.is_system %}
+                    <form method="post" action="{{ url_for('admin.delete_role', role_id=r.id) }}"
+                          onsubmit="return confirm('删除角色 {{ r.name }} ？已分配此角色的用户将失去对应权限。')">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <button type="submit" class="text-xs px-2 py-1 border rounded"
+                              style="color:#b91c1c; border-color:#fecaca;">删除</button>
+                    </form>
+                  {% endif %}
+                </div>
               </div>
-            </div>
-            <div class="mt-2 flex flex-wrap gap-1">
-              {% for p in r.permissions %}
-                <span class="text-xs px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded">{{ p.code }}</span>
-              {% else %}
-                <span class="text-xs text-slate-400">未分配权限</span>
-              {% endfor %}
-            </div>
-          </li>
-        {% endfor %}
-      </ul>
+
+              {# 展开管理面板 #}
+              <div x-show="open" x-cloak class="mt-4 pt-4 border-t border-slate-100 space-y-4">
+                {# 编辑名称/描述 #}
+                {% if not r.is_system %}
+                  <form method="post" action="{{ url_for('admin.edit_role', role_id=r.id) }}"
+                        class="grid sm:grid-cols-2 gap-2">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                    <input name="name" value="{{ r.name }}" required
+                           class="px-3 py-1.5 text-sm border border-slate-200 rounded" />
+                    <input name="description" value="{{ r.description or '' }}" placeholder="描述"
+                           class="px-3 py-1.5 text-sm border border-slate-200 rounded" />
+                    <button type="submit"
+                            class="sm:col-span-2 px-3 py-1.5 text-sm bg-slate-700 hover:bg-slate-600 text-white rounded">
+                      保存基本信息
+                    </button>
+                  </form>
+                {% else %}
+                  <div class="text-xs text-slate-400">内置角色基本信息不可修改，但可调整权限分配。</div>
+                {% endif %}
+
+                {# 分配权限：复选框 #}
+                <form method="post" action="{{ url_for('admin.role_permissions', role_id=r.id) }}">
+                  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                  <div class="text-xs text-slate-500 mb-2">勾选要授予该角色的权限项：</div>
+                  <div class="grid sm:grid-cols-2 gap-1 max-h-64 overflow-y-auto pr-1">
+                    {% set role_perm_ids = r.permissions | map(attribute='id') | list %}
+                    {% for p in perms %}
+                      <label class="flex items-center gap-2 text-sm px-2 py-1 hover:bg-slate-50 rounded cursor-pointer" title="{{ p.code }}">
+                        <input type="checkbox" name="permission_ids" value="{{ p.id }}"
+                               {{ 'checked' if p.id in role_perm_ids }} />
+                        <span class="text-slate-700 truncate">{{ p.name }}</span>
+                      </label>
+                    {% else %}
+                      <span class="text-xs text-slate-400">暂无权限项，请先在右侧新增。</span>
+                    {% endfor %}
+                  </div>
+                  <button type="submit"
+                          class="mt-3 px-3 py-1.5 text-sm bg-indigo-600 hover:bg-indigo-500 text-white rounded">
+                    保存权限分配
+                  </button>
+                </form>
+              </div>
+            </li>
+          {% else %}
+            <li class="text-sm text-slate-400 py-6 text-center">暂无角色</li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
-    <div class="bg-white border border-slate-200 rounded-xl p-5">
-      <h2 class="font-semibold text-slate-800 mb-3">权限项</h2>
-      <ul class="text-sm divide-y divide-slate-100">
-        {% for p in perms %}
-          <li class="py-2 flex items-center justify-between">
-            <span><code class="text-indigo-700">{{ p.code }}</code> · {{ p.name }}</span>
-          </li>
-        {% endfor %}
-      </ul>
+
+    {# ============ 右栏：权限项管理 ============ #}
+    <div class="space-y-6">
+      {# 新增权限 #}
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">+ 新增权限项</h2>
+        <form method="post" action="{{ url_for('admin.new_permission') }}" class="grid sm:grid-cols-2 gap-3">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+          <input name="code" placeholder="code（如 doc.create）" required
+                 class="px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none font-mono" />
+          <input name="name" placeholder="名称（如 创建文档）" required
+                 class="px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none" />
+          <input name="description" placeholder="描述（可选）"
+                 class="sm:col-span-2 px-3 py-2 text-sm border border-slate-200 rounded focus:ring-1 focus:ring-indigo-500 outline-none" />
+          <button type="submit"
+                  class="sm:col-span-2 px-4 py-2 text-sm bg-emerald-600 hover:bg-emerald-500 text-white rounded font-medium"
+                  style="background-color:#059669;">
+            创建权限项
+          </button>
+        </form>
+      </div>
+
+      {# 权限列表 #}
+      <div class="bg-white border border-slate-200 rounded-xl p-5">
+        <h2 class="font-semibold text-slate-800 mb-3">权限项（{{ perms|length }}）</h2>
+        <ul class="text-sm divide-y divide-slate-100">
+          {% for p in perms %}
+            <li class="py-2 flex items-center justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <span class="text-slate-800">{{ p.name }}</span>
+                {% if p.description %}
+                  <div class="text-xs text-slate-400 mt-0.5">{{ p.description }}</div>
+                {% endif %}
+              </div>
+              <form method="post" action="{{ url_for('admin.delete_permission', perm_id=p.id) }}"
+                    onsubmit="return confirm('删除权限 {{ p.code }} ？已绑定此权限的角色将失去该权限。')">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                <button type="submit" class="text-xs px-2 py-1 border rounded shrink-0"
+                        style="color:#b91c1c; border-color:#fecaca;">删除</button>
+              </form>
+            </li>
+          {% else %}
+            <li class="py-6 text-center text-slate-400">暂无权限项</li>
+          {% endfor %}
+        </ul>
+      </div>
     </div>
+
   </div>
 </div>
 {% endblock %}

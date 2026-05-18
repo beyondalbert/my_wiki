@@ -17,6 +17,7 @@
 - [app/config.py](file://app/config.py)
 - [app/templates/doc/edit.html](file://app/templates/doc/edit.html)
 - [app/templates/doc/view.html](file://app/templates/doc/view.html)
+- [app/templates/kb/detail.html](file://app/templates/kb/detail.html)
 - [scripts/fetch_vendors.py](file://scripts/fetch_vendors.py)
 - [scripts/init_db.py](file://scripts/init_db.py)
 - [scripts/reset_db.py](file://scripts/reset_db.py)
@@ -84,6 +85,7 @@
 
 ## 更新摘要
 **所做更改**
+- 新增了完整的文档分组功能：支持知识库内的文档分组管理
 - 更新了编辑器实现部分，反映从Editor.js到Toast UI Editor的完全替换
 - 新增了图片上传集成功能，支持编辑器图片上传和存储
 - 更新了内容存储格式，从Editor.js JSON迁移到Markdown格式
@@ -91,6 +93,7 @@
 - 更新了文档树结构管理和内容处理流程
 - 增强了前端编辑器集成和后端内容存储的说明
 - 新增了中文本地化支持和国际化配置
+- 新增了拖放功能实现，支持文档在分组间的拖拽移动
 
 ## 目录
 1. [简介](#简介)
@@ -105,13 +108,14 @@
 
 ## 简介
 
-文档蓝图是一个基于 Flask 的个人知识库系统，专注于提供高效的文档管理和协作功能。该系统采用现代化的前端编辑器技术，支持富文本编辑、Markdown 渲染和智能文档树结构管理。
+文档蓝图是一个基于 Flask 的个人知识库系统，专注于提供高效的文档管理和协作功能。该系统采用现代化的前端编辑器技术，支持富文本编辑、Markdown 渲染、智能文档树结构管理和完整的文档分组功能。
 
 ### 主要特性
 
 - **富文本编辑器集成**：使用 Toast UI Editor 提供直观的可视化编辑体验
 - **多格式内容管理**：支持文档和电子表格两种内容类型
 - **智能文档树结构**：基于父子关系的层次化文档组织
+- **文档分组管理**：支持知识库内的文档分组和拖拽管理
 - **内容安全过滤**：内置 HTML 和 Markdown 内容安全机制
 - **版本控制与发布**：完整的文档生命周期管理
 - **分享与权限控制**：细粒度的访问权限和分享管理
@@ -142,21 +146,22 @@ subgraph "核心模型"
 C --> L[document.py - 文档模型]
 C --> M[knowledge_base.py - 知识库模型]
 C --> N[user.py - 用户模型]
+C --> O[document.py - 文档分组模型]
 end
 subgraph "服务层"
-D --> O[doc_service.py - 文档服务]
-D --> P[kb_service.py - 知识库服务]
-D --> Q[share_service.py - 分享服务]
+D --> P[doc_service.py - 文档服务]
+D --> Q[kb_service.py - 知识库服务]
+D --> R[share_service.py - 分享服务]
 end
 subgraph "工具模块"
-E --> R[outline.py - 大纲提取]
-E --> S[markdown.py - Markdown处理]
-E --> T[security.py - 安全工具]
+E --> S[outline.py - 大纲提取]
+E --> T[markdown.py - Markdown处理]
+E --> U[security.py - 安全工具]
 end
 subgraph "静态资源"
-G --> U[vendor/ - 第三方库]
-G --> V[css/ - 样式文件]
-G --> W[js/ - JavaScript文件]
+G --> V[vendor/ - 第三方库]
+G --> W[css/ - 样式文件]
+G --> X[js/ - JavaScript文件]
 end
 ```
 
@@ -188,9 +193,17 @@ boolean is_archived
 datetime created_at
 datetime updated_at
 }
+DOC_GROUP {
+string id PK
+string kb_id FK
+string name
+int sort_order
+datetime created_at
+}
 DOCUMENT {
 int id PK
 int kb_id FK
+int group_id FK
 int parent_id FK
 string title
 string type
@@ -223,6 +236,8 @@ datetime created_at
 datetime updated_at
 }
 KNOWLEDGE_BASE ||--o{ DOCUMENT : contains
+KNOWLEDGE_BASE ||--o{ DOC_GROUP : contains
+DOC_GROUP ||--o{ DOCUMENT : contains
 DOCUMENT ||--o{ DOCUMENT_SHARE : shared_by
 USER ||--o{ DOCUMENT : authored_by
 USER ||--o{ DOCUMENT_SHARE : created_by
@@ -262,7 +277,7 @@ H --> K[表格渲染]
 
 ### 整体系统架构
 
-**更新** 系统架构已完全适配新的编辑器实现：
+**更新** 系统架构已完全适配新的编辑器实现和分组功能：
 
 ```mermaid
 graph TB
@@ -272,37 +287,43 @@ B[Toast UI Editor]
 C[Markdown渲染器]
 D[错误处理机制]
 E[图片上传处理]
+F[拖放功能]
+G[分组管理界面]
 end
 subgraph "应用层"
-F[Flask应用工厂]
-G[蓝图路由]
-H[会话管理]
+H[Flask应用工厂]
+I[蓝图路由]
+J[会话管理]
 end
 subgraph "服务层"
-I[文档服务]
-J[知识库服务]
-K[分享服务]
-L[安全服务]
+K[文档服务]
+L[知识库服务]
+M[分享服务]
+N[安全服务]
 end
 subgraph "数据层"
-M[SQLAlchemy ORM]
-N[MySQL数据库]
-O[文件存储]
+O[SQLAlchemy ORM]
+P[MySQL数据库]
+Q[文件存储]
+R[DocGroup表]
 end
-A --> F
-B --> I
-C --> L
-D --> F
-E --> I
-F --> G
-G --> I
-I --> J
+A --> H
+B --> K
+C --> N
+D --> H
+E --> K
+F --> K
+G --> L
+H --> I
 I --> K
-J --> M
+K --> L
 K --> M
-L --> M
-M --> N
+L --> O
 M --> O
+N --> O
+O --> P
+O --> Q
+O --> R
 ```
 
 **图表来源**
@@ -311,13 +332,14 @@ M --> O
 
 ### 请求处理流程
 
-**更新** 请求处理流程已适配新的编辑器实现：
+**更新** 请求处理流程已适配新的编辑器实现和分组功能：
 
 ```mermaid
 sequenceDiagram
 participant U as 用户
 participant A as Flask应用
 participant B as 文档蓝图
+participant C as 知识库蓝图
 participant S as 文档服务
 participant DB as 数据库
 U->>A : GET /doc/new
@@ -334,6 +356,11 @@ S->>DB : 更新Markdown内容和元数据
 DB-->>S : 确认更新
 S-->>B : 返回成功响应
 B-->>U : JSON响应包含大纲和时间戳
+U->>A : POST /kb/{kb_id}/docs/{doc_id}/move-group
+A->>C : move_doc_to_group()
+C->>DB : 更新文档分组
+DB-->>C : 返回更新结果
+C-->>U : JSON响应包含分组ID
 U->>A : POST /upload-image
 A->>B : upload_image()
 B->>DB : 保存图片文件
@@ -344,6 +371,7 @@ B-->>U : JSON响应包含图片URL
 **图表来源**
 - [app/blueprints/doc.py:20-40](file://app/blueprints/doc.py#L20-L40)
 - [app/blueprints/doc.py:69-84](file://app/blueprints/doc.py#L69-L84)
+- [app/blueprints/kb.py:220-241](file://app/blueprints/kb.py#L220-L241)
 
 **章节来源**
 - [app/__init__.py:39-54](file://app/__init__.py#L39-L54)
@@ -362,6 +390,7 @@ classDiagram
 class Document {
 +int id
 +int kb_id
++int group_id
 +int parent_id
 +string title
 +string type
@@ -374,8 +403,17 @@ class Document {
 +datetime updated_at
 +can_be_shared() bool
 }
+class DocGroup {
++string id
++string kb_id
++string name
++int sort_order
++datetime created_at
++kb : KnowledgeBase
++documents : list[Document]
+}
 class DocumentService {
-+create_document(kb, user, title, parent_id, type, privacy) Document
++create_document(kb, user, title, parent_id, type, privacy, group_id) Document
 +update_content(doc, content_json, title) Document
 +list_kb_doc_tree(kb_id) list
 +collect_descendants(doc_id) list
@@ -389,6 +427,8 @@ class OutlineExtractor {
 DocumentService --> Document : 创建和管理
 DocumentService --> OutlineExtractor : 内容处理
 Document --> OutlineExtractor : 提供内容
+DocGroup --> Document : 包含文档
+Document --> DocGroup : 属于分组
 ```
 
 **图表来源**
@@ -464,11 +504,53 @@ D --> H[返回400错误]
 - [app/blueprints/doc.py:25-54](file://app/blueprints/doc.py#L25-L54)
 - [app/config.py:33-42](file://app/config.py#L33-L42)
 
-### 文档树结构管理
+### 文档分组管理
 
-#### 层次化文档组织
+#### 分组模型设计
 
-系统支持多层级的文档组织结构，通过父子关系建立灵活的文档树：
+**新增** 系统引入了完整的文档分组功能，支持知识库内的文档分类管理：
+
+```mermaid
+classDiagram
+class DocGroup {
++string id
++string kb_id
++string name
++int sort_order
++datetime created_at
++kb : KnowledgeBase
++documents : list[Document]
+}
+class Document {
++string id
++string kb_id
++string group_id
++string parent_id
++string title
++string type
++string privacy
++string content_json
++string plain_text
++int sort_order
++boolean is_deleted
++datetime created_at
++datetime updated_at
++kb : KnowledgeBase
++group : DocGroup
++author : User
++parent : Document
+}
+DocGroup --> Document : contains
+Document --> DocGroup : belongs_to
+```
+
+**图表来源**
+- [app/models/document.py:11-24](file://app/models/document.py#L11-L24)
+- [app/models/document.py:37-72](file://app/models/document.py#L37-L72)
+
+#### 分组树结构管理
+
+系统支持多层级的文档组织结构，通过父子关系和分组关系建立灵活的文档树：
 
 ```mermaid
 graph TD
@@ -478,6 +560,9 @@ B --> D[孙文档1]
 B --> E[孙文档2]
 C --> F[孙文档3]
 D --> G[曾孙文档1]
+H[分组1] --> I[文档1]
+H --> J[文档2]
+K[分组2] --> L[文档3]
 style A fill:#e1f5fe
 style B fill:#f3e5f5
 style C fill:#f3e5f5
@@ -485,30 +570,40 @@ style D fill:#e8f5e8
 style E fill:#e8f5e8
 style F fill:#e8f5e8
 style G fill:#fff3e0
+style H fill:#e3f2fd
+style K fill:#e3f2fd
 ```
 
 **图表来源**
 - [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
 
-#### 文档树构建算法
+#### 分组拖放功能
+
+**新增** 系统实现了完整的拖放功能，支持文档在不同分组间的拖拽移动：
 
 ```mermaid
 flowchart TD
-A[查询所有文档] --> B[按父ID分组]
-B --> C[递归构建树结构]
-C --> D{检查父节点}
-D --> |无父节点| E[添加到根节点]
-D --> |有父节点| F[添加到对应子节点]
-E --> G[继续处理下一个]
+A[拖拽开始] --> B[记录文档ID]
+B --> C[鼠标悬停分组区域]
+C --> D{目标分组}
+D --> |有效分组| E[高亮显示拖放区域]
+D --> |未分组区域| F[显示取消分组提示]
+E --> G[释放鼠标]
 F --> G
-G --> H[返回完整文档树]
+G --> H{执行移动}
+H --> |成功| I[更新数据库分组ID]
+H --> |失败| J[显示错误提示]
+I --> K[刷新页面显示]
+J --> L[用户提示]
 ```
 
 **图表来源**
-- [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
+- [app/templates/kb/detail.html:200-227](file://app/templates/kb/detail.html#L200-L227)
 
 **章节来源**
+- [app/models/document.py:11-24](file://app/models/document.py#L11-L24)
 - [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
 
 ### 版本控制与发布流程
 
@@ -627,23 +722,28 @@ end
 
 ### 内部模块依赖
 
-**更新** 内部模块依赖已适配新的编辑器实现：
+**更新** 内部模块依赖已适配新的编辑器实现和分组功能：
 
 ```mermaid
 graph LR
 A[app/__init__.py] --> B[app/blueprints/doc.py]
-A --> C[app/models/document.py]
-A --> D[app/services/doc_service.py]
-B --> D
-B --> E[app/utils/outline.py]
-B --> F[app/services/share_service.py]
-D --> E
-D --> G[app/models/knowledge_base.py]
-H[app/utils/markdown.py] --> I[app/utils/security.py]
-H --> J[第三方库]
+A --> C[app/blueprints/kb.py]
+A --> D[app/models/document.py]
+A --> E[app/services/doc_service.py]
+A --> F[app/services/kb_service.py]
+B --> E
+B --> G[app/utils/outline.py]
+B --> H[app/services/share_service.py]
+C --> F
+C --> E
+C --> I[app/models/document.py]
+D --> G
+D --> J[app/utils/markdown.py]
 K[app/templates/doc/edit.html] --> L[app/static/vendor/js/toastui-editor-all.min.js]
 M[app/templates/doc/view.html] --> L
-N[app/templates/doc/edit.html] --> O[app/static/vendor/js/toastui-editor-i18n-zh-cn.js]
+N[app/templates/kb/detail.html] --> O[拖放功能脚本]
+P[app/templates/doc/edit.html] --> Q[分组选择下拉框]
+R[app/templates/kb/detail.html] --> S[分组管理界面]
 ```
 
 **图表来源**
@@ -660,7 +760,7 @@ N[app/templates/doc/edit.html] --> O[app/static/vendor/js/toastui-editor-i18n-zh
 
 系统采用了多项数据库优化策略来提升性能：
 
-- **索引优化**：在常用查询字段上建立索引，如 `kb_id`、`parent_id`、`is_deleted`
+- **索引优化**：在常用查询字段上建立索引，如 `kb_id`、`parent_id`、`group_id`、`is_deleted`
 - **查询优化**：使用 `order_by` 和 `filter_by` 组合优化查询性能
 - **连接池配置**：启用 `pool_pre_ping` 和合理的 `pool_recycle` 参数
 - **批量操作**：使用 `commit()` 减少数据库往返次数
@@ -707,13 +807,31 @@ N[app/templates/doc/edit.html] --> O[app/static/vendor/js/toastui-editor-i18n-zh
 
 **可能原因**：
 1. 父子关系设置错误
-2. 数据库约束冲突
-3. 查询逻辑问题
+2. 分组关系冲突
+3. 数据库约束冲突
+4. 查询逻辑问题
 
 **解决步骤**：
-1. 检查文档的 `parent_id` 字段
+1. 检查文档的 `parent_id` 和 `group_id` 字段
 2. 验证数据库外键约束
 3. 重新构建文档树缓存
+4. 检查分组排序和嵌套关系
+
+#### 分组功能异常
+
+**新增** **症状**：分组创建、重命名或删除失败
+
+**可能原因**：
+1. **权限不足**（非知识库编辑者）
+2. **分组ID验证失败**
+3. **拖放功能JavaScript错误**
+4. **数据库事务冲突**
+
+**解决步骤**：
+1. **检查用户权限**：确认用户具有知识库编辑权限
+2. **验证分组ID**：确认分组ID在知识库范围内存在
+3. **检查拖放脚本**：确认 kb/detail.html 中的拖放JavaScript正常运行
+4. **查看数据库日志**：检查分组操作的数据库事务状态
 
 #### 分享链接失效
 
@@ -762,13 +880,29 @@ N[app/templates/doc/edit.html] --> O[app/static/vendor/js/toastui-editor-i18n-zh
 3. **检查网络连接**：确认 /upload-image 接口可用
 4. **验证文件大小**：确认不超过 MAX_CONTENT_LENGTH 限制
 
+#### **拖放功能失效**
+
+**新增** **症状**：无法通过拖拽移动文档分组
+
+**可能原因**：
+1. **拖放事件监听器未绑定**
+2. **分组ID数据属性缺失**
+3. **fetch API调用失败**
+4. **权限验证失败**
+
+**解决步骤**：
+1. **检查HTML结构**：确认拖放区域有正确的 data-group-id 属性
+2. **验证JavaScript**：确认 kb/detail.html 中的拖放脚本正常运行
+3. **检查网络请求**：确认 /kb/{kb_id}/docs/{doc_id}/move-group 接口可用
+4. **验证用户权限**：确认用户具有编辑权限
+
 **章节来源**
 - [app/blueprints/doc.py:13-17](file://app/blueprints/doc.py#L13-L17)
 - [app/services/share_service.py:39-43](file://app/services/share_service.py#L39-L43)
 
 ### 错误处理机制
 
-**更新** 系统实现了完善的错误处理机制，包括新的编辑器错误处理：
+**更新** 系统实现了完善的错误处理机制，包括新的编辑器错误处理和分组功能：
 
 ```mermaid
 flowchart TD
@@ -777,17 +911,23 @@ B --> |404| C[文档不存在]
 B --> |403| D[权限不足]
 B --> |编辑器错误| E[Toast UI Editor错误]
 B --> |图片上传错误| F[文件上传失败]
-B --> |其他| G[服务器错误]
-C --> H[返回404页面]
-D --> I[返回403页面]
-E --> J[显示错误提示]
-F --> K[显示上传失败]
-G --> L[返回500页面]
-H --> M[日志记录]
-I --> M
-J --> M
-K --> M
-L --> M
+B --> |分组操作错误| G[分组管理失败]
+B --> |拖放错误| H[拖放功能异常]
+B --> |其他| I[服务器错误]
+C --> J[返回404页面]
+D --> K[返回403页面]
+E --> L[显示错误提示]
+F --> M[显示上传失败]
+G --> N[显示分组错误]
+H --> O[显示拖放错误]
+I --> P[返回500页面]
+J --> Q[日志记录]
+K --> Q
+L --> Q
+M --> Q
+N --> Q
+O --> Q
+P --> Q
 ```
 
 **图表来源**
@@ -805,8 +945,9 @@ L --> M
 3. **性能优化**：合理的数据库设计和查询优化
 4. **用户体验**：直观的编辑器和流畅的操作体验
 5. **现代化技术栈**：采用 Toast UI Editor 提供更好的编辑体验
-6. **功能丰富**：支持图片上传、中文本地化、智能大纲等功能
+6. **功能丰富**：支持图片上传、中文本地化、智能大纲、文档分组等功能
 7. **开发友好**：完善的错误处理和调试支持
+8. **协作增强**：支持分组管理，提升团队协作效率
 
 ### 发展建议
 
@@ -816,5 +957,7 @@ L --> M
 4. **移动端适配**：优化移动端用户体验
 5. **编辑器功能扩展**：利用 Toast UI Editor 的更多特性
 6. **AI集成增强**：结合 Markdown 提取的纯文本进行更智能的AI处理
+7. **分组功能扩展**：支持分组的嵌套和更复杂的组织结构
+8. **拖放优化**：改进拖放体验，支持批量操作和更直观的交互
 
-该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。
+该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。新增的文档分组功能显著提升了系统的组织能力和协作效率，为用户提供了更加灵活和高效的知识管理体验。

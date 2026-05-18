@@ -4,26 +4,30 @@
 **本文引用的文件**
 - [app/blueprints/kb.py](file://app/blueprints/kb.py)
 - [app/services/kb_service.py](file://app/services/kb_service.py)
+- [app/services/doc_service.py](file://app/services/doc_service.py)
 - [app/models/knowledge_base.py](file://app/models/knowledge_base.py)
 - [app/models/document.py](file://app/models/document.py)
-- [app/services/doc_service.py](file://app/services/doc_service.py)
 - [app/models/user.py](file://app/models/user.py)
 - [app/extensions.py](file://app/extensions.py)
 - [app/config.py](file://app/config.py)
 - [app/utils/security.py](file://app/utils/security.py)
 - [app/utils/decorators.py](file://app/utils/decorators.py)
 - [app/templates/kb/unlock.html](file://app/templates/kb/unlock.html)
+- [app/templates/kb/detail.html](file://app/templates/kb/detail.html)
+- [app/templates/kb/edit.html](file://app/templates/kb/edit.html)
+- [app/templates/doc/view.html](file://app/templates/doc/view.html)
 - [app/blueprints/doc.py](file://app/blueprints/doc.py)
 - [app/blueprints/share.py](file://app/blueprints/share.py)
 </cite>
 
 ## 更新摘要
 **变更内容**
-- 新增知识库访问密码保护功能，支持公开知识库设置访问密码
-- 新增 `/kb/<kb_id>/unlock` 解锁路由，处理密码验证和会话管理
-- 在知识库详情和文档详情中集成密码保护检查逻辑
-- 新增会话管理机制，跟踪用户对特定知识库的解锁状态
-- 更新API接口说明，反映新增的解锁功能
+- 新增知识库分组管理功能：支持分组创建、重命名、删除、文档移动等操作
+- 新增DocGroup模型：用于知识库内的文档分组管理
+- 增强文档树展示：支持分组模式的文档树结构
+- 新增拖拽式文档移动：支持通过拖拽将文档移动到不同分组
+- 新增分组管理API路由：包括/groups/new、/groups/<group_id>/rename、/groups/<group_id>/delete、/docs/<doc_id>/move-group
+- 密码保护功能增强：与分组功能结合使用，提供更灵活的访问控制
 
 ## 目录
 1. [简介](#简介)
@@ -40,7 +44,7 @@
 ## 简介
 本文件面向"知识库蓝图"功能模块，提供从架构到实现细节的完整说明。内容覆盖知识库的 CRUD 操作（创建、编辑、删除、可见性控制）、成员管理与权限控制、模板渲染、表单验证与数据持久化流程，并给出 API 接口说明与前端交互示例路径，帮助开发者快速理解与扩展。
 
-**更新** 新增知识库访问密码保护功能，支持对公开知识库设置访问密码，增强知识库的安全性和访问控制能力。
+**更新** 新增知识库分组管理功能，支持文档分组、拖拽移动、分组重命名和删除等操作，同时增强密码保护功能，提供更灵活的访问控制能力。
 
 ## 项目结构
 知识库蓝图位于应用的蓝本层（Blueprint），通过服务层协调模型层与工具层，配合扩展与配置完成认证、CSRF 保护与数据库会话管理。
@@ -50,7 +54,7 @@ graph TB
 subgraph "应用层"
 BP["蓝图: kb 蓝图<br/>路由与视图"]
 SVC_KB["服务: kb_service<br/>访问控制/成员/查询<br/>密码保护/会话管理"]
-SVC_DOC["服务: doc_service<br/>文档树/内容/删除"]
+SVC_DOC["服务: doc_service<br/>文档树/内容/删除<br/>分组管理"]
 UTIL_SEC["工具: security<br/>令牌生成"]
 UTIL_DEC["工具: decorators<br/>权限装饰器"]
 end
@@ -58,6 +62,7 @@ subgraph "模型层"
 M_KB["模型: KnowledgeBase<br/>知识库<br/>访问密码字段"]
 M_KBM["模型: KBMember<br/>成员"]
 M_DOC["模型: Document<br/>文档"]
+M_DOCGRP["模型: DocGroup<br/>文档分组"]
 M_USER["模型: User<br/>用户"]
 end
 subgraph "基础设施"
@@ -69,14 +74,18 @@ CFG["配置: config.py"]
 end
 subgraph "模板层"
 TPL_UNLOCK["模板: unlock.html<br/>密码解锁页面"]
+TPL_DETAIL["模板: detail.html<br/>知识库详情含分组"]
+TPL_EDIT["模板: edit.html<br/>知识库编辑含密码"]
 end
 BP --> SVC_KB
 BP --> SVC_DOC
 SVC_KB --> M_KB
 SVC_KB --> M_KBM
 SVC_DOC --> M_DOC
+SVC_DOC --> M_DOCGRP
 M_KB --> M_USER
 M_KBM --> M_USER
+M_DOC --> M_DOCGRP
 BP --> EXT_DB
 SVC_KB --> EXT_DB
 SVC_DOC --> EXT_DB
@@ -85,48 +94,54 @@ BP --> EXT_CSRF
 BP --> CFG
 UTIL_SEC --> CFG
 TPL_UNLOCK --> BP
+TPL_DETAIL --> BP
+TPL_EDIT --> BP
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
+- [app/blueprints/kb.py:1-242](file://app/blueprints/kb.py#L1-L242)
 - [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
-- [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
+- [app/services/doc_service.py:1-130](file://app/services/doc_service.py#L1-L130)
 - [app/models/knowledge_base.py:1-82](file://app/models/knowledge_base.py#L1-L82)
-- [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
+- [app/models/document.py:1-117](file://app/models/document.py#L1-L117)
 - [app/models/user.py:1-104](file://app/models/user.py#L1-L104)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/utils/security.py:1-8](file://app/utils/security.py#L1-L8)
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
+- [app/templates/kb/detail.html:1-230](file://app/templates/kb/detail.html#L1-L230)
+- [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
 
 **章节来源**
-- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
+- [app/blueprints/kb.py:1-242](file://app/blueprints/kb.py#L1-L242)
 - [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
-- [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
+- [app/services/doc_service.py:1-130](file://app/services/doc_service.py#L1-L130)
 - [app/models/knowledge_base.py:1-82](file://app/models/knowledge_base.py#L1-L82)
-- [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
+- [app/models/document.py:1-117](file://app/models/document.py#L1-L117)
 - [app/models/user.py:1-104](file://app/models/user.py#L1-L104)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
 - [app/utils/security.py:1-8](file://app/utils/security.py#L1-L8)
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
+- [app/templates/kb/detail.html:1-230](file://app/templates/kb/detail.html#L1-L230)
+- [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
 
 ## 核心组件
 - 蓝图路由与视图：负责接收请求、参数校验、调用服务、渲染模板与重定向。
 - 服务层：封装访问控制、成员管理、列表查询、**密码保护检查**与**会话管理**等业务逻辑。
-- 模型层：定义知识库、成员、文档、用户等实体及关系，**新增访问密码相关字段**。
+- 模型层：定义知识库、成员、文档、**文档分组**、用户等实体及关系，**新增访问密码相关字段**。
 - 工具与扩展：安全令牌生成、权限装饰器、登录管理、CSRF 保护、数据库会话。
 - 配置：数据库连接、AI 相关参数、上传与分页等全局设置。
 
-**更新** 新增密码保护检查和会话管理功能，支持对公开知识库设置访问密码并跟踪用户的解锁状态。
+**更新** 新增DocGroup模型和分组管理功能，支持知识库内的文档分组管理，增强文档组织能力。
 
 **章节来源**
-- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
+- [app/blueprints/kb.py:1-242](file://app/blueprints/kb.py#L1-L242)
 - [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
 - [app/models/knowledge_base.py:1-82](file://app/models/knowledge_base.py#L1-L82)
-- [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
+- [app/models/document.py:1-117](file://app/models/document.py#L1-L117)
 - [app/models/user.py:1-104](file://app/models/user.py#L1-L104)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
@@ -136,8 +151,8 @@ TPL_UNLOCK --> BP
 ## 架构总览
 知识库蓝图采用典型的 MVC 分层：
 - 视图层：蓝图路由处理 HTTP 请求，调用服务层执行业务逻辑。
-- 服务层：封装领域规则（访问控制、成员角色、可见性、**密码保护**）。
-- 模型层：ORM 映射数据库表，定义实体关系与约束，**包含访问密码字段**。
+- 服务层：封装领域规则（访问控制、成员角色、可见性、**密码保护**、**分组管理**）。
+- 模型层：ORM 映射数据库表，定义实体关系与约束，**包含访问密码字段和分组模型**。
 - 基础设施：扩展统一注入，配置集中管理。
 
 ```mermaid
@@ -160,10 +175,10 @@ V->>V : "redirect /kb/<kb_id>/unlock?next=/kb/<kb_id>"
 V-->>U : "渲染解锁页面"
 else "允许访问且无需密码"
 V->>D : "list_kb_doc_tree(kb_id)"
-D->>DB : "查询文档树"
-DB-->>D : "返回文档集合"
-D-->>V : "返回嵌套树"
-V-->>U : "渲染详情页"
+D->>DB : "查询文档树和分组"
+DB-->>D : "返回文档集合和分组"
+D-->>V : "返回分组文档树"
+V-->>U : "渲染详情页含分组"
 else "拒绝访问"
 V-->>U : "403 禁止"
 end
@@ -172,18 +187,19 @@ end
 **图表来源**
 - [app/blueprints/kb.py:56-74](file://app/blueprints/kb.py#L56-L74)
 - [app/services/kb_service.py:10-23](file://app/services/kb_service.py#L10-L23)
-- [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
+- [app/services/doc_service.py:11-72](file://app/services/doc_service.py#L11-L72)
 
 ## 详细组件分析
 
 ### 路由与视图（蓝图）
 - 列表页：支持"我的知识库/公开知识库"切换，调用服务层查询。
 - 新建知识库：表单提交后进行必填项与可见性校验，创建后写入数据库并跳转详情。
-- 详情页：校验访问权限，**检查是否需要密码解锁**，构建文档树，选择默认打开的首篇文档，传递可编辑/可管理标记。
+- 详情页：校验访问权限，**检查是否需要密码解锁**，构建文档树（**支持分组模式**），选择默认打开的首篇文档，传递可编辑/可管理标记。
 - 编辑知识库：仅管理员可编辑，更新名称、描述、可见性与图标，**支持设置/清除访问密码**。
 - 删除知识库：仅管理员可删除，执行软删除（归档）。
 - 成员管理：仅管理员可邀请/移除成员，设置成员角色（查看者/编辑者）。
 - **解锁页面**：**新增**，处理公开知识库的密码验证，设置会话状态并重定向到原始页面。
+- **分组管理**：**新增**，支持分组创建、重命名、删除和文档移动操作。
 
 ```mermaid
 flowchart TD
@@ -192,7 +208,7 @@ LoadKB --> CheckAccess{"can_access 通过?"}
 CheckAccess -- 否 --> Deny["403 禁止访问"]
 CheckAccess -- 是 --> CheckUnlock{"requires_unlock?"}
 CheckUnlock -- 是 --> RedirectUnlock["重定向到解锁页面"]
-CheckUnlock -- 否 --> BuildTree["构建文档树"]
+CheckUnlock -- 否 --> BuildTree["构建分组文档树"]
 RedirectUnlock --> UnlockPage["渲染解锁页面"]
 UnlockPage --> ValidatePassword{"密码验证"}
 ValidatePassword -- 正确 --> SetSession["设置会话状态"]
@@ -200,7 +216,7 @@ SetSession --> RedirectBack["重定向到原始页面"]
 ValidatePassword -- 错误 --> ShowError["显示错误信息"]
 ShowError --> UnlockPage
 BuildTree --> SelectFirst["选择首篇文档"]
-SelectFirst --> Render["渲染详情页"]
+SelectFirst --> Render["渲染详情页含分组"]
 Deny --> End(["结束"])
 Render --> End
 RedirectBack --> End
@@ -212,7 +228,7 @@ RedirectBack --> End
 - [app/services/kb_service.py:66-80](file://app/services/kb_service.py#L66-L80)
 
 **章节来源**
-- [app/blueprints/kb.py:21-171](file://app/blueprints/kb.py#L21-L171)
+- [app/blueprints/kb.py:21-242](file://app/blueprints/kb.py#L21-L242)
 
 ### 访问控制与权限
 - 可访问性判定：公开知识库直接放行；私有/成员可见需登录且满足所有条件之一：超级管理员、拥有者、成员。
@@ -241,19 +257,27 @@ class KBMember {
 +user_id : int
 +role : string
 }
+class DocGroup {
++id : string
++kb_id : string
++name : string
++sort_order : int
++created_at : datetime
+}
 class User {
 +id : int
 +username : string
 +is_super_admin : bool
 }
 KnowledgeBase "1" <-- "many" KBMember : "拥有成员"
+KnowledgeBase "1" <-- "many" DocGroup : "包含分组"
 User "1" <-- "many" KBMember : "成员身份"
 KnowledgeBase "1" <-- "many" Document : "包含文档"
 ```
 
 **图表来源**
 - [app/models/knowledge_base.py:22-62](file://app/models/knowledge_base.py#L22-L62)
-- [app/models/document.py:20-46](file://app/models/document.py#L20-L46)
+- [app/models/document.py:11-25](file://app/models/document.py#L11-L25)
 - [app/models/user.py:55-104](file://app/models/user.py#L55-L104)
 
 **章节来源**
@@ -288,7 +312,7 @@ V-->>U : "闪存提示并重定向"
 - [app/services/kb_service.py:100-114](file://app/services/kb_service.py#L100-L114)
 
 ### 文档树与内容持久化
-- 文档树：基于父节点聚合与递归构建，过滤已删除文档，排序依据是否为根节点、排序号与ID。
+- 文档树：基于父节点聚合与递归构建，过滤已删除文档，排序依据是否为根节点、排序号与ID。**新增分组支持**，将文档按分组组织。
 - 内容更新：更新标题、Editor.js JSON 内容与纯文本摘要（由工具函数提取）。
 - 软删除：将文档标记为已删除，不影响知识库其他文档。
 
@@ -297,25 +321,66 @@ flowchart TD
 A["输入: kb_id"] --> Q["查询非删除文档"]
 Q --> G["按父节点分组"]
 G --> R["递归构建树形结构"]
-R --> O["输出: 嵌套列表"]
+R --> O["输出: 分组嵌套列表"]
 ```
 
 **图表来源**
-- [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
+- [app/services/doc_service.py:11-72](file://app/services/doc_service.py#L11-L72)
 
 **章节来源**
-- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
+- [app/services/doc_service.py:11-130](file://app/services/doc_service.py#L11-L130)
+
+### 分组管理功能详解
+**新增** 知识库分组管理功能提供了灵活的文档组织能力：
+
+- **分组创建**：支持创建新的文档分组，自动设置排序号和默认名称。
+- **分组重命名**：允许编辑分组名称，实时更新数据库。
+- **分组删除**：删除分组时，将分组内的所有文档移回"未分组"状态。
+- **文档移动**：支持拖拽式文档移动到不同分组，或从分组移出到未分组。
+- **权限控制**：仅具有编辑权限的用户可以进行分组管理操作。
+- **前端交互**：提供拖拽界面和表单操作，支持JSON和表单两种提交方式。
+
+```mermaid
+flowchart TD
+A["用户操作分组"] --> B{"操作类型?"}
+B -- "创建分组" --> C["POST /kb/<kb_id>/groups/new"]
+C --> D["生成排序号 + 1"]
+D --> E["创建分组记录"]
+E --> F["重定向详情页"]
+B -- "重命名分组" --> G["POST /kb/<kb_id>/groups/<group_id>/rename"]
+G --> H["更新分组名称"]
+H --> I["重定向详情页"]
+B -- "删除分组" --> J["POST /kb/<kb_id>/groups/<group_id>/delete"]
+J --> K["文档移回未分组"]
+K --> L["删除分组记录"]
+L --> M["重定向详情页"]
+B -- "移动文档" --> N["POST /kb/<kb_id>/docs/<doc_id>/move-group"]
+N --> O{"目标分组?"}
+O -- "有目标" --> P["设置 group_id"]
+O -- "无目标" --> Q["清空 group_id"]
+P --> R["重定向或返回JSON"]
+Q --> R
+```
+
+**图表来源**
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
+
+**章节来源**
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
+- [app/services/doc_service.py:11-72](file://app/services/doc_service.py#L11-L72)
 
 ### 表单验证与数据持久化
 - 新建知识库：校验名称必填与可见性合法，填充默认图标，写入数据库并闪存提示。
 - 编辑知识库：校验可见性合法，更新名称、描述、可见性与图标，**支持设置/清除访问密码**。
 - 成员管理：校验用户名/邮箱唯一性，避免重复添加拥有者，更新角色或新增成员。
 - **密码设置**：**新增**，仅对公开知识库生效，支持设置新密码或清除现有密码。
+- **分组管理**：**新增**，创建分组时验证名称，重命名时更新名称，删除分组时处理文档迁移。
 
 **章节来源**
 - [app/blueprints/kb.py:32-53](file://app/blueprints/kb.py#L32-L53)
 - [app/blueprints/kb.py:77-103](file://app/blueprints/kb.py#L77-L103)
 - [app/blueprints/kb.py:136-159](file://app/blueprints/kb.py#L136-L159)
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
 
 ### API 接口说明（蓝图路由）
 以下为知识库蓝图提供的端点（以蓝图前缀 /kb 开头）：
@@ -333,7 +398,7 @@ R --> O["输出: 嵌套列表"]
   - 权限：登录用户
 - GET /kb/<kb_id>
   - 路由参数：kb_id（字符串类型）
-  - 返回：知识库详情模板（含文档树与首篇文档）
+  - 返回：知识库详情模板（含文档树与首篇文档，**支持分组模式**）
   - 权限：可访问（公开/成员/拥有者）
   - **新增**：若知识库设置了访问密码且用户未解锁，重定向到解锁页面
 - GET /kb/<kb_id>/edit
@@ -374,24 +439,48 @@ R --> O["输出: 嵌套列表"]
   - 表单字段：password（密码）、next（隐藏字段）
   - 行为：验证密码，设置会话状态并重定向到原始页面
   - 权限：可访问（公开/成员/拥有者）
+- **新增**：POST /kb/<kb_id>/groups/new
+  - 路由参数：kb_id（字符串类型）
+  - 表单字段：name（分组名称）
+  - 行为：创建新分组并重定向详情
+  - 权限：可编辑（编辑者/拥有者）
+- **新增**：POST /kb/<kb_id>/groups/<group_id>/rename
+  - 路由参数：kb_id（字符串类型）、group_id（字符串类型）
+  - 表单字段：name（新名称）
+  - 行为：更新分组名称并重定向详情
+  - 权限：可编辑（编辑者/拥有者）
+- **新增**：POST /kb/<kb_id>/groups/<group_id>/delete
+  - 路由参数：kb_id（字符串类型）、group_id（字符串类型）
+  - 行为：删除分组并将文档移至未分组，重定向详情
+  - 权限：可编辑（编辑者/拥有者）
+- **新增**：POST /kb/<kb_id>/docs/<doc_id>/move-group
+  - 路由参数：kb_id（字符串类型）、doc_id（字符串类型）
+  - 表单字段：group_id（目标分组ID，可为空）
+  - 行为：移动文档到指定分组或移至未分组，支持JSON响应
+  - 权限：可编辑（编辑者/拥有者）
 
-**更新** 新增密码保护功能相关的路由，包括解锁页面的GET和POST请求处理。
+**更新** 新增分组管理相关的四个路由，包括分组创建、重命名、删除和文档移动功能。
 
 **章节来源**
-- [app/blueprints/kb.py:21-171](file://app/blueprints/kb.py#L21-L171)
+- [app/blueprints/kb.py:21-242](file://app/blueprints/kb.py#L21-L242)
 
 ### 前端交互示例（路径参考）
 - 新建知识库：在新建模板中提交表单至 /kb/new，表单字段与验证逻辑见蓝图处理。
 - 编辑知识库：在编辑模板中提交表单至 /kb/<kb_id>/edit，字段与可见性校验见蓝图处理，**新增访问密码设置选项**。
 - 成员管理：在成员模板中提交表单至 /kb/<kb_id>/members，字段与角色校验见蓝图处理。
-- 详情页：渲染知识库详情与文档树，根据 can_edit/can_manage 控制按钮显示。
+- 详情页：渲染知识库详情与文档树（**支持分组模式**），根据 can_edit/can_manage 控制按钮显示，**新增分组操作界面**。
 - **解锁页面**：**新增**，在解锁模板中提交表单至 /kb/<kb_id>/unlock，输入密码后验证并设置会话状态。
+- **分组管理**：**新增**，通过拖拽将文档移动到不同分组，或通过表单操作创建、重命名、删除分组。
 
 **章节来源**
 - [app/blueprints/kb.py:32-103](file://app/blueprints/kb.py#L32-L103)
 - [app/blueprints/kb.py:106-121](file://app/blueprints/kb.py#L106-L121)
 - [app/blueprints/kb.py:136-171](file://app/blueprints/kb.py#L136-L171)
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
+- [app/templates/kb/detail.html:1-230](file://app/templates/kb/detail.html#L1-L230)
+- [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
+- [app/templates/doc/view.html:260-285](file://app/templates/doc/view.html#L260-L285)
 
 ### 密码保护功能详解
 **新增** 知识库访问密码保护功能提供了对公开知识库的额外安全层：
@@ -432,6 +521,7 @@ J --> G
 - 蓝图依赖服务层与工具层，服务层依赖模型层与扩展，模型层依赖数据库。
 - 访问控制与成员管理集中在服务层，确保视图层职责单一。
 - **新增**：密码保护功能依赖会话管理，与共享功能的会话管理机制类似。
+- **新增**：分组管理功能依赖DocGroup模型和文档服务的分组支持。
 - 扩展统一注入，配置集中管理，便于部署与测试。
 
 ```mermaid
@@ -445,14 +535,15 @@ KB_BP --> CFG["配置: config.py"]
 KB_BP --> SEC["工具: security"]
 KB_BP --> DEC["工具: decorators"]
 KB_SVC --> SESSION["会话管理<br/>解锁状态"]
+DOC_SVC --> GROUPS["分组管理<br/>DocGroup模型"]
 ```
 
 **图表来源**
-- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
+- [app/blueprints/kb.py:1-242](file://app/blueprints/kb.py#L1-L242)
 - [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
-- [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
+- [app/services/doc_service.py:1-130](file://app/services/doc_service.py#L1-L130)
 - [app/models/knowledge_base.py:1-82](file://app/models/knowledge_base.py#L1-L82)
-- [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
+- [app/models/document.py:1-117](file://app/models/document.py#L1-L117)
 - [app/models/user.py:1-104](file://app/models/user.py#L1-L104)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
@@ -460,11 +551,11 @@ KB_SVC --> SESSION["会话管理<br/>解锁状态"]
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 
 **章节来源**
-- [app/blueprints/kb.py:1-171](file://app/blueprints/kb.py#L1-L171)
+- [app/blueprints/kb.py:1-242](file://app/blueprints/kb.py#L1-L242)
 - [app/services/kb_service.py:1-115](file://app/services/kb_service.py#L1-L115)
-- [app/services/doc_service.py:1-81](file://app/services/doc_service.py#L1-L81)
+- [app/services/doc_service.py:1-130](file://app/services/doc_service.py#L1-L130)
 - [app/models/knowledge_base.py:1-82](file://app/models/knowledge_base.py#L1-L82)
-- [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
+- [app/models/document.py:1-117](file://app/models/document.py#L1-L117)
 - [app/models/user.py:1-104](file://app/models/user.py#L1-L104)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
@@ -474,9 +565,11 @@ KB_SVC --> SESSION["会话管理<br/>解锁状态"]
 ## 性能考虑
 - 查询优化：知识库列表与成员查询均使用索引列过滤，减少全表扫描。
 - 文档树构建：先按父节点分组再递归，时间复杂度与文档层级深度相关，建议控制层级与批量查询。
+- **新增**：分组查询优化：分组查询按排序号和创建时间排序，支持快速定位。
 - 数据库事务：单次请求内多次写入合并提交，减少往返开销。
 - 缓存策略：可在服务层引入轻量缓存（如成员角色与可访问性结果）以降低重复查询成本。
 - **新增**：会话存储优化：解锁状态存储在会话中，避免频繁的数据库查询。
+- **新增**：拖拽操作优化：前端使用fetch API进行异步操作，提升用户体验。
 
 ## 故障排查指南
 - 403 禁止访问：确认当前用户是否满足访问条件（登录、超级管理员、拥有者、成员）。
@@ -486,6 +579,8 @@ KB_SVC --> SESSION["会话管理<br/>解锁状态"]
 - CSRF 校验失败：确保表单包含 CSRF 令牌并在蓝图中启用 CSRFProtect。
 - **新增**：密码解锁失败：确认密码是否正确，检查知识库是否设置了访问密码，确认会话是否正常工作。
 - **新增**：访问密码设置无效：确认知识库可见性为公开，只有公开知识库才支持设置访问密码。
+- **新增**：分组操作失败：确认用户具有编辑权限，检查分组ID是否有效，确保文档ID对应正确的知识库。
+- **新增**：文档移动失败：确认目标分组存在且属于同一知识库，检查拖拽操作的JSON格式。
 
 **章节来源**
 - [app/blueprints/kb.py:14-18](file://app/blueprints/kb.py#L14-L18)
@@ -495,15 +590,17 @@ KB_SVC --> SESSION["会话管理<br/>解锁状态"]
 ## 结论
 知识库蓝图通过清晰的分层设计实现了完整的 CRUD 与权限控制：以服务层为核心组织访问控制与成员管理，以蓝图路由承载用户交互，以模型层表达领域实体，辅以扩展与配置保障运行稳定性。
 
-**更新** 新增的知识库访问密码保护功能进一步增强了系统的安全性，通过会话管理和豁免规则实现了灵活的访问控制策略。该设计易于扩展新功能（如文档分享、RAG 索引等）并保持良好的可维护性。
+**更新** 新增的知识库分组管理功能显著增强了系统的文档组织能力，支持灵活的分组创建、重命名、删除和文档移动操作。密码保护功能与分组管理相结合，为用户提供更精细的访问控制策略。该设计易于扩展新功能（如文档分享、RAG 索引等）并保持良好的可维护性。
 
 ## 附录
 - 安全令牌：提供 URL 安全的随机令牌生成工具，适用于分享链接等场景。
 - 权限装饰器：支持超级管理员强制通过与细粒度权限码校验。
 - **新增**：会话管理：提供统一的会话状态管理机制，支持知识库解锁状态和文档分享状态的跟踪。
+- **新增**：分组管理：提供完整的文档分组生命周期管理，包括创建、重命名、删除和文档移动等操作。
 
 **章节来源**
 - [app/utils/security.py:5-7](file://app/utils/security.py#L5-L7)
 - [app/utils/decorators.py:8-32](file://app/utils/decorators.py#L8-L32)
 - [app/services/kb_service.py:48-64](file://app/services/kb_service.py#L48-L64)
 - [app/blueprints/share.py:11-19](file://app/blueprints/share.py#L11-L19)
+- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)

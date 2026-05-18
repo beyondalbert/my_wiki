@@ -45,6 +45,19 @@
               <span>📊</span><span>新建表格</span>
             </button>
           </form>
+          {# 新建分组 #}
+          <div x-data="{ open: false }">
+            <button @click="open = !open" type="button"
+                    class="w-full inline-flex items-center justify-center gap-1 px-3 py-1.5 text-sm text-slate-600 hover:text-indigo-600 hover:bg-slate-50 border border-slate-200 rounded">
+              <span>📁</span><span>新建分组</span>
+            </button>
+            <form x-show="open" x-cloak method="post" action="{{ url_for('kb.new_group', kb_id=kb.id) }}" class="mt-2 flex gap-1">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+              <input name="name" placeholder="分组名称" required
+                     class="flex-1 px-2 py-1 text-sm border border-slate-300 rounded" />
+              <button type="submit" class="px-2 py-1 text-sm bg-indigo-600 text-white rounded">创建</button>
+            </form>
+          </div>
           {% endif %}
           {% if can_manage %}
             <a href="{{ url_for('kb.members', kb_id=kb.id) }}"
@@ -62,13 +75,31 @@
             {% for section in tree %}
               {% if section.group %}
                 <div class="mt-2 first:mt-0 group-section drop-zone"
-                     data-sort-group data-group-id="{{ section.group.id }}" x-data="{ expanded: true }">
-                  <div class="flex items-center gap-1 px-2 py-1 w-full"
+                     data-sort-group data-group-id="{{ section.group.id }}" x-data="{ expanded: true, editing: false }">
+                  <div class="flex items-center gap-1 px-2 py-1 w-full group"
                        {% if can_edit %}draggable="true" data-drag-group="{{ section.group.id }}"{% endif %}>
-                    <button @click="expanded = !expanded" class="flex items-center gap-1 text-left flex-1">
-                      <span class="text-xs text-slate-400" x-text="expanded ? '▼' : '▶'"></span>
-                      <span class="text-xs font-medium text-slate-500 truncate">📁 {{ section.group.name }}</span>
+                    <button @click="expanded = !expanded" class="text-xs text-slate-400" title="展开/折叠">
+                      <span x-text="expanded ? '▼' : '▶'"></span>
                     </button>
+                    <span x-show="!editing" class="text-xs font-medium text-slate-500 uppercase tracking-wide truncate flex-1">📁 {{ section.group.name }}</span>
+                    {% if can_edit %}
+                    <button x-show="!editing" @click="editing = true" class="grp-action text-xs text-slate-400 hover:text-indigo-600" title="重命名">✏️</button>
+                    <form x-show="editing" x-cloak method="post"
+                          action="{{ url_for('kb.rename_group', kb_id=kb.id, group_id=section.group.id) }}"
+                          class="flex-1 flex gap-1">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <input name="name" value="{{ section.group.name }}" class="flex-1 px-1 py-0.5 text-xs border border-slate-300 rounded" />
+                      <button type="submit" class="text-xs text-indigo-600">✓</button>
+                      <button type="button" @click="editing = false" class="text-xs text-slate-400">✗</button>
+                    </form>
+                    <form x-show="!editing" method="post"
+                          action="{{ url_for('kb.delete_group', kb_id=kb.id, group_id=section.group.id) }}"
+                          onsubmit="return confirm('删除分组？文档将移至未分组')"
+                          class="grp-action">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <button class="text-xs text-slate-400 hover:text-rose-600" title="删除分组">🗑️</button>
+                    </form>
+                    {% endif %}
                   </div>
                   <ul x-show="expanded" class="ml-3 border-l border-slate-200 pl-1"
                       data-sort-docs data-group-id="{{ section.group.id }}">
@@ -173,6 +204,8 @@
   .drag-over-zone { outline: 2px dashed #818cf8; outline-offset: -2px; background-color: #eef2ff; }
   [draggable="true"] { cursor: grab; }
   [draggable="true"]:active { cursor: grabbing; }
+  .grp-action { display: none; }
+  .group:hover .grp-action { display: inline-flex; }
 </style>
 {% endblock %}
 

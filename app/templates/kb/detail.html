@@ -25,6 +25,8 @@
   .drag-over-zone { outline: 2px dashed #818cf8; outline-offset: -2px; background-color: #eef2ff; }
   [draggable="true"] { cursor: grab; }
   [draggable="true"]:active { cursor: grabbing; }
+  .grp-action { display: none; }
+  .group-header:hover .grp-action { display: inline-flex; }
 </style>
 {% endblock %}
 
@@ -101,7 +103,7 @@
                     </button>
                     <span x-show="!editing" class="text-xs font-medium text-slate-500 uppercase tracking-wide truncate flex-1">📁 {{ section.group.name }}</span>
                     {% if can_edit %}
-                    <button x-show="!editing" @click="editing = true" class="hidden group-hover:inline text-xs text-slate-400 hover:text-indigo-600" title="重命名">✏️</button>
+                    <button x-show="!editing" @click="editing = true" class="grp-action text-xs text-slate-400 hover:text-indigo-600" title="重命名">✏️</button>
                     <form x-show="editing" x-cloak method="post"
                           action="{{ url_for('kb.rename_group', kb_id=kb.id, group_id=section.group.id) }}"
                           class="flex-1 flex gap-1">
@@ -113,7 +115,7 @@
                     <form x-show="!editing" method="post"
                           action="{{ url_for('kb.delete_group', kb_id=kb.id, group_id=section.group.id) }}"
                           onsubmit="return confirm('删除分组？文档将移至未分组')"
-                          class="hidden group-hover:inline">
+                          class="grp-action">
                       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
                       <button class="text-xs text-slate-400 hover:text-rose-600" title="删除分组">🗑️</button>
                     </form>

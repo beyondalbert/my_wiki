@@ -85,15 +85,12 @@
 
 ## 更新摘要
 **所做更改**
-- 新增了完整的文档分组功能：支持知识库内的文档分组管理
-- 更新了编辑器实现部分，反映从Editor.js到Toast UI Editor的完全替换
-- 新增了图片上传集成功能，支持编辑器图片上传和存储
-- 更新了内容存储格式，从Editor.js JSON迁移到Markdown格式
-- 新增了JavaScript初始化代码和错误处理机制的详细说明
-- 更新了文档树结构管理和内容处理流程
-- 增强了前端编辑器集成和后端内容存储的说明
-- 新增了中文本地化支持和国际化配置
-- 新增了拖放功能实现，支持文档在分组间的拖拽移动
+- 新增了完整的拖拽排序功能：在文档树中实现文档级别和分组级别的拖拽排序系统
+- 更新了文档树结构管理，支持实时拖拽排序和跨组文档移动
+- 新增了分组拖拽排序功能，支持分组的重新排列
+- 增强了前端交互体验，提供实时视觉反馈和自动保存机制
+- 更新了知识库详情页面的拖拽排序实现
+- 新增了拖拽排序的后端API处理逻辑
 
 ## 目录
 1. [简介](#简介)
@@ -116,6 +113,9 @@
 - **多格式内容管理**：支持文档和电子表格两种内容类型
 - **智能文档树结构**：基于父子关系的层次化文档组织
 - **文档分组管理**：支持知识库内的文档分组和拖拽管理
+- **拖拽排序系统**：完整的文档级别和分组级别拖拽排序功能
+- **跨组文档移动**：支持将文档从一个分组移动到另一个分组
+- **实时视觉反馈**：拖拽过程中的高亮显示和占位符效果
 - **内容安全过滤**：内置 HTML 和 Markdown 内容安全机制
 - **版本控制与发布**：完整的文档生命周期管理
 - **分享与权限控制**：细粒度的访问权限和分享管理
@@ -277,7 +277,7 @@ H --> K[表格渲染]
 
 ### 整体系统架构
 
-**更新** 系统架构已完全适配新的编辑器实现和分组功能：
+**更新** 系统架构已完全适配新的编辑器实现和拖拽排序功能：
 
 ```mermaid
 graph TB
@@ -287,43 +287,46 @@ B[Toast UI Editor]
 C[Markdown渲染器]
 D[错误处理机制]
 E[图片上传处理]
-F[拖放功能]
+F[拖拽排序功能]
 G[分组管理界面]
+H[实时视觉反馈]
 end
 subgraph "应用层"
-H[Flask应用工厂]
-I[蓝图路由]
-J[会话管理]
+I[Flask应用工厂]
+J[蓝图路由]
+K[会话管理]
 end
 subgraph "服务层"
-K[文档服务]
-L[知识库服务]
-M[分享服务]
-N[安全服务]
+L[文档服务]
+M[知识库服务]
+N[分享服务]
+O[安全服务]
 end
 subgraph "数据层"
-O[SQLAlchemy ORM]
-P[MySQL数据库]
-Q[文件存储]
-R[DocGroup表]
+P[SQLAlchemy ORM]
+Q[MySQL数据库]
+R[文件存储]
+S[DocGroup表]
+T[拖拽排序API]
 end
-A --> H
-B --> K
-C --> N
-D --> H
-E --> K
-F --> K
-G --> L
-H --> I
-I --> K
-K --> L
-K --> M
-L --> O
+A --> I
+B --> L
+C --> O
+D --> I
+E --> L
+F --> T
+G --> M
+H --> F
+I --> J
+J --> L
+L --> M
+L --> N
 M --> O
-N --> O
 O --> P
-O --> Q
-O --> R
+P --> Q
+P --> R
+P --> S
+T --> P
 ```
 
 **图表来源**
@@ -332,7 +335,7 @@ O --> R
 
 ### 请求处理流程
 
-**更新** 请求处理流程已适配新的编辑器实现和分组功能：
+**更新** 请求处理流程已适配新的编辑器实现和拖拽排序功能：
 
 ```mermaid
 sequenceDiagram
@@ -340,6 +343,7 @@ participant U as 用户
 participant A as Flask应用
 participant B as 文档蓝图
 participant C as 知识库蓝图
+participant D as 拖拽排序API
 participant S as 文档服务
 participant DB as 数据库
 U->>A : GET /doc/new
@@ -356,11 +360,16 @@ S->>DB : 更新Markdown内容和元数据
 DB-->>S : 确认更新
 S-->>B : 返回成功响应
 B-->>U : JSON响应包含大纲和时间戳
-U->>A : POST /kb/{kb_id}/docs/{doc_id}/move-group
-A->>C : move_doc_to_group()
-C->>DB : 更新文档分组
-DB-->>C : 返回更新结果
-C-->>U : JSON响应包含分组ID
+U->>A : 拖拽排序操作
+A->>D : /kb/{kb_id}/sort-docs
+D->>DB : 更新文档排序和分组
+DB-->>D : 返回更新结果
+D-->>U : JSON响应确认排序
+U->>A : 拖拽分组操作
+A->>D : /kb/{kb_id}/sort-groups
+D->>DB : 更新分组排序
+DB-->>D : 返回更新结果
+D-->>U : JSON响应确认分组排序
 U->>A : POST /upload-image
 A->>B : upload_image()
 B->>DB : 保存图片文件
@@ -504,106 +513,145 @@ D --> H[返回400错误]
 - [app/blueprints/doc.py:25-54](file://app/blueprints/doc.py#L25-L54)
 - [app/config.py:33-42](file://app/config.py#L33-L42)
 
-### 文档分组管理
+### 拖拽排序系统
 
-#### 分组模型设计
+#### 拖拽排序架构
 
-**新增** 系统引入了完整的文档分组功能，支持知识库内的文档分类管理：
+**新增** 系统实现了完整的拖拽排序功能，支持文档级别和分组级别的拖拽操作：
 
 ```mermaid
 classDiagram
-class DocGroup {
-+string id
-+string kb_id
-+string name
-+int sort_order
-+datetime created_at
-+kb : KnowledgeBase
-+documents : list[Document]
+class DragDropSystem {
++dragging : Object
++KB_ID : string
++initialize() void
++handleDocDragStart() void
++handleDocDragOver() void
++handleDocDrop() void
++handleGroupDragStart() void
++handleGroupDragOver() void
++submitDocOrder() void
++submitGroupOrder() void
++getDragAfterElement() Element
++updateIndent() void
 }
-class Document {
-+string id
-+string kb_id
-+string group_id
-+string parent_id
-+string title
-+string type
-+string privacy
-+string content_json
-+string plain_text
-+int sort_order
-+boolean is_deleted
-+datetime created_at
-+datetime updated_at
-+kb : KnowledgeBase
-+group : DocGroup
-+author : User
-+parent : Document
+class DocTreeManager {
++renderNode() string
++buildTreeStructure() list
++handleCrossGroupMove() void
 }
-DocGroup --> Document : contains
-Document --> DocGroup : belongs_to
+class SortAPI {
++sortDocs() JSON
++sortGroups() JSON
++moveDocToGroup() JSON
+}
+DragDropSystem --> DocTreeManager : 管理文档树
+DragDropSystem --> SortAPI : 调用排序API
+DocTreeManager --> SortAPI : 触发排序请求
 ```
 
 **图表来源**
-- [app/models/document.py:11-24](file://app/models/document.py#L11-L24)
-- [app/models/document.py:37-72](file://app/models/document.py#L37-L72)
+- [app/templates/kb/detail.html:195-317](file://app/templates/kb/detail.html#L195-L317)
+- [app/templates/doc/view.html:266-371](file://app/templates/doc/view.html#L266-L371)
 
-#### 分组树结构管理
+#### 文档拖拽排序实现
 
-系统支持多层级的文档组织结构，通过父子关系和分组关系建立灵活的文档树：
-
-```mermaid
-graph TD
-A[根文档] --> B[子文档1]
-A --> C[子文档2]
-B --> D[孙文档1]
-B --> E[孙文档2]
-C --> F[孙文档3]
-D --> G[曾孙文档1]
-H[分组1] --> I[文档1]
-H --> J[文档2]
-K[分组2] --> L[文档3]
-style A fill:#e1f5fe
-style B fill:#f3e5f5
-style C fill:#f3e5f5
-style D fill:#e8f5e8
-style E fill:#e8f5e8
-style F fill:#e8f5e8
-style G fill:#fff3e0
-style H fill:#e3f2fd
-style K fill:#e3f2fd
-```
-
-**图表来源**
-- [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
-
-#### 分组拖放功能
-
-**新增** 系统实现了完整的拖放功能，支持文档在不同分组间的拖拽移动：
+系统支持在同一个分组内重新排序文档，并提供实时的视觉反馈：
 
 ```mermaid
 flowchart TD
-A[拖拽开始] --> B[记录文档ID]
-B --> C[鼠标悬停分组区域]
-C --> D{目标分组}
-D --> |有效分组| E[高亮显示拖放区域]
-D --> |未分组区域| F[显示取消分组提示]
-E --> G[释放鼠标]
+A[拖拽开始] --> B[记录文档ID和源UL]
+B --> C[鼠标悬停目标UL]
+C --> D{目标UL类型}
+D --> |同一分组| E[更新文档顺序]
+D --> |跨分组| F[更新文档分组ID]
+E --> G[更新文档排序号]
 F --> G
-G --> H{执行移动}
-H --> |成功| I[更新数据库分组ID]
-H --> |失败| J[显示错误提示]
-I --> K[刷新页面显示]
-J --> L[用户提示]
+G --> H[发送排序请求到后端]
+H --> I[更新UI显示]
+I --> J[清除拖拽状态]
 ```
 
 **图表来源**
-- [app/templates/kb/detail.html:200-227](file://app/templates/kb/detail.html#L200-L227)
+- [app/templates/kb/detail.html:226-250](file://app/templates/kb/detail.html#L226-L250)
+- [app/templates/doc/view.html:278-301](file://app/templates/doc/view.html#L278-L301)
+
+#### 分组拖拽排序实现
+
+系统支持重新排列分组的顺序，并提供拖拽过程中的视觉反馈：
+
+```mermaid
+flowchart TD
+A[拖拽分组开始] --> B[记录分组元素]
+B --> C[拖拽过程中更新位置]
+C --> D{计算目标位置}
+D --> |找到位置| E[插入到目标位置]
+D --> |未找到| F[追加到最后]
+E --> G[更新分组排序号]
+F --> G
+G --> H[发送分组排序请求]
+H --> I[更新UI显示]
+I --> J[清除拖拽状态]
+```
+
+**图表来源**
+- [app/templates/kb/detail.html:318-350](file://app/templates/kb/detail.html#L318-L350)
+- [app/templates/doc/view.html:370-414](file://app/templates/doc/view.html#L370-L414)
+
+#### 实时视觉反馈机制
+
+系统提供了丰富的视觉反馈，帮助用户理解拖拽操作的状态：
+
+```mermaid
+flowchart TD
+A[拖拽开始] --> B[添加drag-ghost类]
+B --> C[鼠标悬停目标区域]
+C --> D{目标类型判断}
+D --> |文档区域| E[添加drag-over-zone类]
+D --> |分组区域| F[高亮显示分组]
+D --> |未分组区域| G[显示取消分组提示]
+E --> H[更新占位符样式]
+F --> H
+G --> H
+H --> I[更新缩进级别]
+I --> J[更新文档间距]
+J --> K[显示拖拽光标效果]
+```
+
+**图表来源**
+- [app/templates/kb/detail.html:22-29](file://app/templates/kb/detail.html#L22-L29)
+- [app/templates/doc/view.html:171-177](file://app/templates/doc/view.html#L171-L177)
+
+#### 自动保存机制
+
+系统在拖拽操作完成后自动保存排序结果，确保数据一致性：
+
+```mermaid
+flowchart TD
+A[拖拽结束] --> B{检查目标UL}
+B --> |有目标UL| C[收集文档ID顺序]
+B --> |无目标UL| D[跳过保存]
+C --> E[调用submitDocOrder函数]
+E --> F[构造排序请求]
+F --> G[发送POST请求到/sort-docs]
+G --> H[等待响应]
+H --> I{请求成功?}
+I --> |是| J[更新UI状态]
+I --> |否| K[显示错误提示]
+J --> L[清除拖拽状态]
+K --> L
+D --> L
+L --> M[恢复默认样式]
+```
+
+**图表来源**
+- [app/templates/kb/detail.html:207-224](file://app/templates/kb/detail.html#L207-L224)
+- [app/templates/doc/view.html:266-275](file://app/templates/doc/view.html#L266-L275)
 
 **章节来源**
-- [app/models/document.py:11-24](file://app/models/document.py#L11-L24)
-- [app/services/doc_service.py:11-34](file://app/services/doc_service.py#L11-L34)
-- [app/blueprints/kb.py:175-241](file://app/blueprints/kb.py#L175-L241)
+- [app/blueprints/kb.py:244-291](file://app/blueprints/kb.py#L244-L291)
+- [app/templates/kb/detail.html:195-389](file://app/templates/kb/detail.html#L195-L389)
+- [app/templates/doc/view.html:266-437](file://app/templates/doc/view.html#L266-L437)
 
 ### 版本控制与发布流程
 
@@ -722,7 +770,7 @@ end
 
 ### 内部模块依赖
 
-**更新** 内部模块依赖已适配新的编辑器实现和分组功能：
+**更新** 内部模块依赖已适配新的编辑器实现和拖拽排序功能：
 
 ```mermaid
 graph LR
@@ -741,9 +789,11 @@ D --> G
 D --> J[app/utils/markdown.py]
 K[app/templates/doc/edit.html] --> L[app/static/vendor/js/toastui-editor-all.min.js]
 M[app/templates/doc/view.html] --> L
-N[app/templates/kb/detail.html] --> O[拖放功能脚本]
+N[app/templates/kb/detail.html] --> O[拖拽排序JavaScript]
 P[app/templates/doc/edit.html] --> Q[分组选择下拉框]
-R[app/templates/kb/detail.html] --> S[分组管理界面]
+R[app/templates/kb/detail.html] --> S[拖拽排序界面]
+T[app/blueprints/kb.py] --> U[sort-docs API]
+V[app/blueprints/kb.py] --> W[sort-groups API]
 ```
 
 **图表来源**
@@ -781,6 +831,15 @@ R[app/templates/kb/detail.html] --> S[分组管理界面]
 - **CSRF保护**：启用 Flask-WTF 的 CSRF 防护
 - **数据库事务**：使用 SQLAlchemy 的事务管理
 
+### 拖拽排序性能优化
+
+**新增** 拖拽排序功能采用了多种性能优化策略：
+
+- **前端状态管理**：使用内存中的拖拽状态避免频繁DOM操作
+- **批量更新**：拖拽结束后一次性提交排序结果
+- **防抖处理**：对频繁的拖拽事件进行节流处理
+- **虚拟滚动**：对于大量文档的情况，考虑使用虚拟滚动优化
+
 ## 故障排除指南
 
 ### 常见问题诊断
@@ -816,6 +875,24 @@ R[app/templates/kb/detail.html] --> S[分组管理界面]
 2. 验证数据库外键约束
 3. 重新构建文档树缓存
 4. 检查分组排序和嵌套关系
+
+#### 拖拽排序功能异常
+
+**新增** **症状**：拖拽排序功能无法正常使用
+
+**可能原因**：
+1. **拖拽事件监听器未绑定**
+2. **HTML数据属性缺失**
+3. **JavaScript初始化错误**
+4. **拖拽排序API调用失败**
+5. **权限验证失败**
+
+**解决步骤**：
+1. **检查HTML结构**：确认拖拽元素有正确的 `data-doc-id` 和 `draggable` 属性
+2. **验证JavaScript**：确认拖拽排序脚本正常加载和执行
+3. **检查网络请求**：确认 `/kb/{kb_id}/sort-docs` 和 `/kb/{kb_id}/sort-groups` 接口可用
+4. **验证用户权限**：确认用户具有编辑权限
+5. **查看浏览器控制台**：检查JavaScript错误和网络请求状态
 
 #### 分组功能异常
 
@@ -880,29 +957,13 @@ R[app/templates/kb/detail.html] --> S[分组管理界面]
 3. **检查网络连接**：确认 /upload-image 接口可用
 4. **验证文件大小**：确认不超过 MAX_CONTENT_LENGTH 限制
 
-#### **拖放功能失效**
-
-**新增** **症状**：无法通过拖拽移动文档分组
-
-**可能原因**：
-1. **拖放事件监听器未绑定**
-2. **分组ID数据属性缺失**
-3. **fetch API调用失败**
-4. **权限验证失败**
-
-**解决步骤**：
-1. **检查HTML结构**：确认拖放区域有正确的 data-group-id 属性
-2. **验证JavaScript**：确认 kb/detail.html 中的拖放脚本正常运行
-3. **检查网络请求**：确认 /kb/{kb_id}/docs/{doc_id}/move-group 接口可用
-4. **验证用户权限**：确认用户具有编辑权限
-
 **章节来源**
 - [app/blueprints/doc.py:13-17](file://app/blueprints/doc.py#L13-L17)
 - [app/services/share_service.py:39-43](file://app/services/share_service.py#L39-L43)
 
 ### 错误处理机制
 
-**更新** 系统实现了完善的错误处理机制，包括新的编辑器错误处理和分组功能：
+**更新** 系统实现了完善的错误处理机制，包括新的编辑器错误处理和拖拽排序功能：
 
 ```mermaid
 flowchart TD
@@ -911,23 +972,26 @@ B --> |404| C[文档不存在]
 B --> |403| D[权限不足]
 B --> |编辑器错误| E[Toast UI Editor错误]
 B --> |图片上传错误| F[文件上传失败]
-B --> |分组操作错误| G[分组管理失败]
-B --> |拖放错误| H[拖放功能异常]
-B --> |其他| I[服务器错误]
-C --> J[返回404页面]
-D --> K[返回403页面]
-E --> L[显示错误提示]
-F --> M[显示上传失败]
-G --> N[显示分组错误]
-H --> O[显示拖放错误]
-I --> P[返回500页面]
-J --> Q[日志记录]
-K --> Q
-L --> Q
-M --> Q
-N --> Q
-O --> Q
-P --> Q
+B --> |拖拽排序错误| G[拖拽操作异常]
+B --> |分组操作错误| H[分组管理失败]
+B --> |拖放错误| I[拖放功能异常]
+B --> |其他| J[服务器错误]
+C --> K[返回404页面]
+D --> L[返回403页面]
+E --> M[显示错误提示]
+F --> N[显示上传失败]
+G --> O[显示拖拽错误]
+H --> P[显示分组错误]
+I --> Q[显示拖放错误]
+J --> R[返回500页面]
+K --> S[日志记录]
+L --> S
+M --> S
+N --> S
+O --> S
+P --> S
+Q --> S
+R --> S
 ```
 
 **图表来源**
@@ -948,6 +1012,18 @@ P --> Q
 6. **功能丰富**：支持图片上传、中文本地化、智能大纲、文档分组等功能
 7. **开发友好**：完善的错误处理和调试支持
 8. **协作增强**：支持分组管理，提升团队协作效率
+9. **拖拽排序系统**：提供直观的文档组织和管理方式
+10. **实时反馈机制**：拖拽过程中的视觉反馈提升用户体验
+
+### 新增拖拽排序功能的优势
+
+**新增** 拖拽排序功能显著提升了系统的易用性和效率：
+
+- **直观的操作方式**：用户可以通过拖拽直接调整文档和分组的顺序
+- **实时视觉反馈**：拖拽过程中的高亮显示和占位符效果帮助用户理解操作结果
+- **跨组移动能力**：支持将文档从一个分组移动到另一个分组，实现灵活的文档组织
+- **自动保存机制**：拖拽完成后自动保存排序结果，确保数据一致性
+- **性能优化**：采用前端状态管理和批量更新策略，提升拖拽操作的流畅性
 
 ### 发展建议
 
@@ -958,6 +1034,8 @@ P --> Q
 5. **编辑器功能扩展**：利用 Toast UI Editor 的更多特性
 6. **AI集成增强**：结合 Markdown 提取的纯文本进行更智能的AI处理
 7. **分组功能扩展**：支持分组的嵌套和更复杂的组织结构
-8. **拖放优化**：改进拖放体验，支持批量操作和更直观的交互
+8. **拖拽优化**：改进拖拽体验，支持批量操作和更直观的交互
+9. **拖拽动画**：添加平滑的拖拽动画效果提升用户体验
+10. **拖拽辅助线**：在拖拽过程中显示辅助线指示插入位置
 
-该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。新增的文档分组功能显著提升了系统的组织能力和协作效率，为用户提供了更加灵活和高效的知识管理体验。
+该系统为个人和团队知识管理提供了坚实的技术基础，适合进一步的功能扩展和定制开发。新增的拖拽排序功能显著提升了系统的组织能力和协作效率，为用户提供了更加灵活和高效的知识管理体验。完整的拖拽排序系统包括文档级别的拖拽排序、分组级别的拖拽排序、跨组文档移动和实时视觉反馈，为用户提供了直观而强大的文档管理方式。

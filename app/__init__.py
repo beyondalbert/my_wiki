@@ -62,8 +62,10 @@ def _register_blueprints(app: Flask) -> None:
     from .blueprints.share import bp as share_bp
     from .blueprints.ai import bp as ai_bp
     from .blueprints.main import bp as main_bp
+    from .blueprints.search import bp as search_bp
 
     app.register_blueprint(main_bp)
+    app.register_blueprint(search_bp)
     app.register_blueprint(auth_bp, url_prefix="/auth")
     app.register_blueprint(user_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")

@@ -1,7 +1,7 @@
 {# Top navigation bar #}
 <header class="bg-white sticky top-0 z-30 border-b border-slate-200 shadow-sm">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between">
-    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 group">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 flex items-center justify-between gap-3">
+    <a href="{{ url_for('main.index') }}" class="flex items-center gap-2 group shrink-0">
       <span class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold shadow-sm">麦</span>
       <span class="font-semibold text-slate-800 group-hover:text-indigo-600">{{ site_name }}</span>
     </a>
@@ -14,10 +14,64 @@
           <a class="px-3 py-1.5 rounded-md text-rose-600 hover:bg-rose-50" href="{{ url_for('admin.index') }}">超管</a>
         {% endif %}
       {% else %}
-        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('kb.list_kbs', tab='public') if false else url_for('main.index') }}">首页</a>
+        <a class="px-3 py-1.5 rounded-md hover:bg-slate-100" href="{{ url_for('main.index') }}">首页</a>
       {% endif %}
     </nav>
+
     <div class="flex items-center gap-2">
+      {# --- Global search --- #}
+      {% if current_user.is_authenticated %}
+      <div x-data="globalSearch" class="relative" @keydown.escape="open=false">
+        <div class="flex items-center border border-slate-200 rounded-lg px-2 py-1 gap-1.5 bg-slate-50 focus-within:border-indigo-300 focus-within:ring-1 focus-within:ring-indigo-200 transition"
+             @click="if(!$refs.input) return; $refs.input.focus()">
+          <svg class="w-4 h-4 text-slate-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input x-ref="input"
+                 x-model="q"
+                 @focus="onFocus"
+                 @input.debounce.300ms="doSearch"
+                 type="text"
+                 placeholder="搜索文档..."
+                 class="w-28 sm:w-40 lg:w-52 bg-transparent text-sm outline-none placeholder-slate-400" />
+          <kbd x-show="!q" class="hidden lg:inline text-xs text-slate-300 border border-slate-200 rounded px-1">/</kbd>
+        </div>
+        {# Dropdown results #}
+        <div x-show="open && (results.length > 0 || searching === false && q.length >= 2)"
+             x-transition:enter="transition ease-out duration-100"
+             x-transition:enter-start="opacity-0 -translate-y-1"
+             x-transition:enter-end="opacity-100 translate-y-0"
+             x-transition:leave="transition ease-in duration-75"
+             x-transition:leave-start="opacity-100"
+             x-transition:leave-end="opacity-0"
+             @click.outside="open=false"
+             x-cloak
+             class="absolute right-0 mt-2 w-80 sm:w-96 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden z-50">
+          <div class="max-h-[70vh] overflow-y-auto">
+            <template x-if="searching">
+              <div class="px-4 py-6 text-center text-sm text-slate-400">搜索中...</div>
+            </template>
+            <template x-if="!searching && results.length === 0 && q.length >= 2">
+              <div class="px-4 py-6 text-center text-sm text-slate-400">未找到匹配的文档</div>
+            </template>
+            <template x-for="r in results" :key="r.id">
+              <a :href="'/doc/' + r.id"
+                 class="block px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 transition">
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs" x-text="r.type === 'sheet' ? '📊' : '📄'"></span>
+                  <span class="text-sm font-medium text-slate-800 truncate" x-text="r.title"></span>
+                </div>
+                <div class="mt-1 text-xs text-slate-400 flex items-center gap-2">
+                  <span x-text="r.kb_name"></span>
+                  <span x-text="r.updated_at"></span>
+                </div>
+                <p x-show="r.snippet" class="mt-1 text-xs text-slate-500 line-clamp-2" x-text="r.snippet"></p>
+              </a>
+            </template>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      {# --- User menu --- #}
       {% if current_user.is_authenticated %}
         <div x-data="{open:false}" class="relative">
           <button @click="open=!open" class="flex items-center gap-2 px-2 py-1 rounded-md hover:bg-slate-100">
@@ -43,3 +97,46 @@
     </div>
   </div>
 </header>
+
+{% if current_user.is_authenticated %}
+<script>
+document.addEventListener('alpine:init', function () {
+  Alpine.data('globalSearch', function () {
+    return {
+      q: '',
+      open: false,
+      searching: false,
+      results: [],
+      _timer: null,
+      onFocus: function () {
+        if (this.q.length >= 2) this.open = true;
+      },
+      doSearch: function () {
+        var self = this;
+        if (self.q.length < 2) { self.open = false; self.results = []; return; }
+        self.open = true;
+        self.searching = true;
+        clearTimeout(self._timer);
+        self._timer = setTimeout(function () {
+          fetch('/search?q=' + encodeURIComponent(self.q))
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              self.results = data.results || [];
+              self.searching = false;
+            })
+            .catch(function () { self.searching = false; });
+        }, 200);
+      }
+    };
+  });
+});
+// Press "/" to focus search
+document.addEventListener('keydown', function (e) {
+  if (e.key === '/' && !['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) {
+    e.preventDefault();
+    var input = document.querySelector('[x-data="globalSearch"] input');
+    if (input) input.focus();
+  }
+});
+</script>
+{% endif %}

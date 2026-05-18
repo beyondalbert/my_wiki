@@ -2,7 +2,7 @@
 {% block title %}{{ kb.name }} · {{ site_name }}{% endblock %}
 
 {% macro render_node(node, level=0) %}
-  <li>
+  <li data-doc-id="{{ node.id }}" class="doc-li">
     <a href="{{ url_for('doc.view', doc_id=node.id) }}"
        draggable="true" data-doc-id="{{ node.id }}"
        class="doc-tree-item flex items-center gap-1 px-2 py-1 rounded text-sm truncate hover:bg-slate-50"
@@ -18,6 +18,15 @@
     {% endif %}
   </li>
 {% endmacro %}
+
+{% block head_extra %}
+<style>
+  .drag-ghost { opacity: 0.4; }
+  .drag-over-zone { outline: 2px dashed #818cf8; outline-offset: -2px; background-color: #eef2ff; }
+  [draggable="true"] { cursor: grab; }
+  [draggable="true"]:active { cursor: grabbing; }
+</style>
+{% endblock %}
 
 {% block content %}
 <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -76,14 +85,17 @@
         </div>
         {% endif %}
 
-        {# 文档列表（分组模式）#}
-        <div class="p-2 max-h-[60vh] overflow-y-auto">
+        {# 文档列表（分组模式 + 拖拽排序）#}
+        <div class="p-2 max-h-[60vh] overflow-y-auto" data-sort-groups>
           {% if tree %}
             {% for section in tree %}
               {% if section.group %}
-                {# 分组标题 #}
-                <div x-data="{ expanded: true, editing: false }" class="mt-2 first:mt-0 drop-zone" data-group-id="{{ section.group.id }}">
-                  <div class="flex items-center gap-1 px-2 py-1 group">
+                {# 分组（可拖拽排序）#}
+                <div x-data="{ expanded: true, editing: false }"
+                     class="mt-2 first:mt-0 group-section drop-zone"
+                     data-sort-group data-group-id="{{ section.group.id }}">
+                  <div class="flex items-center gap-1 px-2 py-1 group group-header"
+                       {% if can_edit %}draggable="true" data-drag-group="{{ section.group.id }}"{% endif %}>
                     <button @click="expanded = !expanded" class="text-xs text-slate-400" title="展开/折叠">
                       <span x-text="expanded ? '▼' : '▶'"></span>
                     </button>
@@ -107,27 +119,27 @@
                     </form>
                     {% endif %}
                   </div>
-                  <ul x-show="expanded" class="ml-3 border-l border-slate-200 pl-1">
+                  <ul x-show="expanded" class="ml-3 border-l border-slate-200 pl-1"
+                      data-sort-docs data-group-id="{{ section.group.id }}">
                     {% for node in section.docs %}{{ render_node(node, 1) }}{% endfor %}
                     {% if not section.docs %}
-                      <li class="text-xs text-slate-300 px-4 py-1">（空）</li>
+                      <li class="text-xs text-slate-300 px-4 py-1 placeholder-empty">（空）</li>
                     {% endif %}
                   </ul>
                 </div>
               {% else %}
-                {# 未分组文档 #}
+                {# 未分组（不可作为分组拖拽，但接收文档）#}
                 <div class="drop-zone" data-group-id="">
-                <div class="px-2 pt-1 pb-0.5 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
-                  <span>未分组</span>
-                  {% if section.docs %}<span class="text-slate-300">{{ section.docs|length }}</span>{% endif %}
-                </div>
-                {% if section.docs %}
-                <ul>
-                  {% for node in section.docs %}{{ render_node(node) }}{% endfor %}
-                </ul>
-                {% else %}
-                <p class="text-xs text-slate-300 px-4 py-1">（拖拽文档到此取消分组）</p>
-                {% endif %}
+                  <div class="px-2 pt-1 pb-0.5 text-xs text-slate-400 uppercase tracking-wide flex items-center justify-between">
+                    <span>未分组</span>
+                    {% if section.docs %}<span class="text-slate-300">{{ section.docs|length }}</span>{% endif %}
+                  </div>
+                  <ul data-sort-docs data-group-id="">
+                    {% for node in section.docs %}{{ render_node(node) }}{% endfor %}
+                    {% if not section.docs %}
+                      <li class="text-xs text-slate-300 px-4 py-1 placeholder-empty">（拖拽文档到此取消分组）</li>
+                    {% endif %}
+                  </ul>
                 </div>
               {% endif %}
             {% endfor %}
@@ -178,52 +190,198 @@
 <script>
 (function () {
   var KB_ID = '{{ kb.id }}';
-  var draggingDocId = null;
+  var dragging = null; // { type:'doc'|'group', el: HTMLElement, sourceUl?: HTMLElement }
 
-  // Drag start on doc items
-  document.querySelectorAll('[data-doc-id][draggable]').forEach(function (el) {
-    el.addEventListener('dragstart', function (e) {
-      draggingDocId = el.getAttribute('data-doc-id');
+  // ---------- DOC drag (sort + cross-group move) ----------
+  document.querySelectorAll('a.doc-tree-item[draggable="true"]').forEach(function (a) {
+    a.addEventListener('dragstart', function (e) {
+      e.stopPropagation();
+      var li = a.closest('li.doc-li');
+      if (!li) return;
+      dragging = { type: 'doc', el: li, sourceUl: li.parentElement };
       e.dataTransfer.effectAllowed = 'move';
-      e.dataTransfer.setData('text/plain', draggingDocId);
-      el.style.opacity = '0.5';
+      try { e.dataTransfer.setData('text/plain', a.getAttribute('data-doc-id') || ''); } catch (_) {}
+      // Defer class so the drag image is captured before opacity changes
+      setTimeout(function () { li.classList.add('drag-ghost'); }, 0);
     });
-    el.addEventListener('dragend', function () {
-      el.style.opacity = '';
-      draggingDocId = null;
-      document.querySelectorAll('.drop-zone').forEach(function (z) {
-        z.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
-      });
+    a.addEventListener('dragend', function () {
+      if (!dragging) return;
+      var li = dragging.el;
+      li.classList.remove('drag-ghost');
+      // Submit new order for the destination UL
+      var destUl = li.parentElement;
+      if (destUl && destUl.hasAttribute('data-sort-docs')) {
+        submitDocOrder(destUl);
+        // If moved to a different UL, also update source UL ordering
+        if (dragging.sourceUl && dragging.sourceUl !== destUl
+            && dragging.sourceUl.hasAttribute && dragging.sourceUl.hasAttribute('data-sort-docs')) {
+          submitDocOrder(dragging.sourceUl);
+        }
+      }
+      cleanupZones();
+      dragging = null;
     });
   });
 
-  // Drop zones
+  document.querySelectorAll('[data-sort-docs]').forEach(function (ul) {
+    ul.addEventListener('dragover', function (e) {
+      if (!dragging || dragging.type !== 'doc') return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = 'move';
+      // Remove placeholder if dragging into an empty UL
+      var placeholder = ul.querySelector(':scope > li.placeholder-empty');
+      if (placeholder) placeholder.remove();
+      var afterEl = getDragAfterElement(ul, e.clientY);
+      var moved = false;
+      if (afterEl == null) {
+        if (dragging.el.parentElement !== ul || ul.lastElementChild !== dragging.el) {
+          ul.appendChild(dragging.el);
+          moved = true;
+        }
+      } else if (afterEl !== dragging.el) {
+        ul.insertBefore(dragging.el, afterEl);
+        moved = true;
+      }
+      if (moved) {
+        updateIndent(dragging.el, ul.closest('[data-sort-group]') ? 1 : 0);
+      }
+    });
+  });
+
+  // Allow dropping anywhere within a drop-zone (forward to inner UL)
   document.querySelectorAll('.drop-zone').forEach(function (zone) {
     zone.addEventListener('dragover', function (e) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-      zone.classList.add('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+      if (!dragging || dragging.type !== 'doc') return;
+      // If hover lands on the section (not the UL), forward to UL append
+      if (e.target === zone) {
+        var ul = zone.querySelector(':scope [data-sort-docs]');
+        if (ul && dragging.el.parentElement !== ul) {
+          var ph = ul.querySelector(':scope > li.placeholder-empty');
+          if (ph) ph.remove();
+          ul.appendChild(dragging.el);
+          updateIndent(dragging.el, ul.closest('[data-sort-group]') ? 1 : 0);
+          e.preventDefault();
+        }
+      }
+      zone.classList.add('drag-over-zone');
     });
-    zone.addEventListener('dragleave', function () {
-      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
+    zone.addEventListener('dragleave', function (e) {
+      if (e.target === zone) zone.classList.remove('drag-over-zone');
     });
-    zone.addEventListener('drop', function (e) {
-      e.preventDefault();
-      zone.classList.remove('ring-2', 'ring-indigo-300', 'bg-indigo-50');
-      var docId = e.dataTransfer.getData('text/plain');
-      if (!docId) return;
-      var groupId = zone.getAttribute('data-group-id') || '';
-      var url = '/kb/' + KB_ID + '/docs/' + docId + '/move-group';
-      fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ group_id: groupId })
-      }).then(function (r) {
-        if (r.ok) { location.reload(); }
-        else { alert('移动失败'); }
-      }).catch(function () { alert('网络错误'); });
+    zone.addEventListener('drop', function () {
+      zone.classList.remove('drag-over-zone');
     });
   });
+
+  function getDragAfterElement(container, y) {
+    var items = [].slice.call(container.querySelectorAll(':scope > li[data-doc-id]'));
+    var result = null;
+    var closest = Number.NEGATIVE_INFINITY;
+    items.forEach(function (child) {
+      if (child === dragging.el) return;
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest) {
+        closest = offset;
+        result = child;
+      }
+    });
+    return result;
+  }
+
+  // Update inline padding-left of an <li> and its descendant doc <li>s based on level
+  function updateIndent(li, level) {
+    var a = li.querySelector(':scope > a.doc-tree-item');
+    if (a) {
+      a.style.paddingLeft = (0.5 + level * 0.75) + 'rem';
+    }
+    var childUl = li.querySelector(':scope > ul');
+    if (childUl) {
+      [].slice.call(childUl.querySelectorAll(':scope > li[data-doc-id]')).forEach(function (childLi) {
+        updateIndent(childLi, level + 1);
+      });
+    }
+  }
+
+  function submitDocOrder(ul) {
+    var groupId = ul.getAttribute('data-group-id') || '';
+    var order = [].slice.call(ul.querySelectorAll(':scope > li[data-doc-id]'))
+                  .map(function (li) { return li.getAttribute('data-doc-id'); });
+    fetch('/kb/' + KB_ID + '/sort-docs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ group_id: groupId, order: order })
+    }).catch(function () { /* silent */ });
+  }
+
+  // ---------- GROUP drag (reorder groups) ----------
+  document.querySelectorAll('[data-drag-group][draggable="true"]').forEach(function (handle) {
+    handle.addEventListener('dragstart', function (e) {
+      e.stopPropagation();
+      var section = handle.closest('[data-sort-group]');
+      if (!section) return;
+      dragging = { type: 'group', el: section };
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', section.getAttribute('data-group-id') || ''); } catch (_) {}
+      setTimeout(function () { section.classList.add('drag-ghost'); }, 0);
+    });
+    handle.addEventListener('dragend', function () {
+      if (!dragging) return;
+      dragging.el.classList.remove('drag-ghost');
+      submitGroupOrder();
+      dragging = null;
+    });
+  });
+
+  var groupContainer = document.querySelector('[data-sort-groups]');
+  if (groupContainer) {
+    groupContainer.addEventListener('dragover', function (e) {
+      if (!dragging || dragging.type !== 'group') return;
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      var afterEl = getGroupAfterElement(groupContainer, e.clientY);
+      if (afterEl == null) {
+        groupContainer.appendChild(dragging.el);
+      } else if (afterEl !== dragging.el) {
+        groupContainer.insertBefore(dragging.el, afterEl);
+      }
+    });
+  }
+
+  function getGroupAfterElement(container, y) {
+    var items = [].slice.call(container.querySelectorAll(':scope > [data-sort-group]'));
+    var result = null;
+    var closest = Number.NEGATIVE_INFINITY;
+    items.forEach(function (child) {
+      if (child === dragging.el) return;
+      var box = child.getBoundingClientRect();
+      var offset = y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest) {
+        closest = offset;
+        result = child;
+      }
+    });
+    return result;
+  }
+
+  function submitGroupOrder() {
+    var sections = document.querySelectorAll('[data-sort-groups] > [data-sort-group]');
+    var order = [].slice.call(sections)
+                  .map(function (s) { return s.getAttribute('data-group-id'); })
+                  .filter(Boolean);
+    fetch('/kb/' + KB_ID + '/sort-groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order: order })
+    }).catch(function () { /* silent */ });
+  }
+
+  function cleanupZones() {
+    document.querySelectorAll('.drop-zone').forEach(function (z) {
+      z.classList.remove('drag-over-zone');
+    });
+  }
 })();
 </script>
 {% endif %}

@@ -239,3 +239,52 @@ def move_doc_to_group(kb_id, doc_id):
     if request.is_json:
         return jsonify({"ok": True, "group_id": target_group_id})
     return redirect(request.referrer or url_for("kb.detail", kb_id=kb.id))
+
+
+# ---------- Sorting ----------
+
+@bp.route("/<kb_id>/sort-groups", methods=["POST"])
+@login_required
+def sort_groups(kb_id):
+    """Reorder groups. Expects JSON: {"order": ["gid1", "gid2", ...]}"""
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    data = request.get_json(silent=True) or {}
+    order = data.get("order", [])
+    if not isinstance(order, list):
+        return jsonify({"ok": False, "msg": "invalid order"}), 400
+    groups = DocGroup.query.filter_by(kb_id=kb.id).all()
+    group_map = {g.id: g for g in groups}
+    for idx, gid in enumerate(order):
+        if gid in group_map:
+            group_map[gid].sort_order = idx
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@bp.route("/<kb_id>/sort-docs", methods=["POST"])
+@login_required
+def sort_docs(kb_id):
+    """Reorder docs within a group. Expects JSON: {"group_id": "..."|null, "order": ["did1", ...]}"""
+    kb = _get_kb_or_404(kb_id)
+    if not kb_service.can_edit(current_user, kb):
+        abort(403)
+    data = request.get_json(silent=True) or {}
+    group_id = (data.get("group_id") or "").strip() or None
+    order = data.get("order", [])
+    if not isinstance(order, list):
+        return jsonify({"ok": False, "msg": "invalid order"}), 400
+    # Validate group exists
+    if group_id:
+        grp = DocGroup.query.filter_by(id=group_id, kb_id=kb.id).first()
+        if not grp:
+            return jsonify({"ok": False, "msg": "group not found"}), 404
+    # Update sort_order for docs; also move doc into the target group
+    for idx, did in enumerate(order):
+        doc = Document.query.filter_by(id=did, kb_id=kb.id, is_deleted=False).first()
+        if doc:
+            doc.sort_order = idx
+            doc.group_id = group_id
+    db.session.commit()
+    return jsonify({"ok": True})

@@ -28,6 +28,9 @@
 - 新增拖拽式文档移动：支持通过拖拽将文档移动到不同分组
 - 新增分组管理API路由：包括/groups/new、/groups/<group_id>/rename、/groups/<group_id>/delete、/docs/<doc_id>/move-group
 - **新增**：完整拖拽排序系统：新增sort_groups()和sort_docs() API端点，实现组排序和文档排序功能，包括跨组文档移动、实时排序更新和异步提交机制
+- **新增**：Alpine.js交互式分组管理：采用Alpine.js实现响应式UI，支持分组的展开/折叠、重命名编辑模式切换
+- **新增**：改进的拖拽排序体验：优化拖拽视觉反馈、占位符显示和跨组移动的用户体验
+- **新增**：增强的前端用户界面：改进的样式设计、更好的视觉层次和交互反馈
 - 密码保护功能增强：与分组功能结合使用，提供更灵活的访问控制
 
 ## 目录
@@ -45,7 +48,7 @@
 ## 简介
 本文件面向"知识库蓝图"功能模块，提供从架构到实现细节的完整说明。内容覆盖知识库的 CRUD 操作（创建、编辑、删除、可见性控制）、成员管理与权限控制、模板渲染、表单验证与数据持久化流程，并给出 API 接口说明与前端交互示例路径，帮助开发者快速理解与扩展。
 
-**更新** 新增知识库分组管理功能，支持文档分组、拖拽移动、分组重命名和删除等操作，同时增强密码保护功能，提供更灵活的访问控制能力。**新增**完整拖拽排序系统，支持组间拖拽排序和文档实时排序更新。
+**更新** 新增知识库分组管理功能，支持文档分组、拖拽移动、分组重命名和删除等操作，同时增强密码保护功能，提供更灵活的访问控制能力。**新增**完整的拖拽排序系统，支持组间拖拽排序和文档实时排序更新。**新增** Alpine.js 交互式分组管理和改进的拖拽排序体验，提供更直观的用户界面。
 
 ## 项目结构
 知识库蓝图位于应用的蓝本层（Blueprint），通过服务层协调模型层与工具层，配合扩展与配置完成认证、CSRF 保护与数据库会话管理。
@@ -111,7 +114,7 @@ TPL_EDIT --> BP
 - [app/utils/security.py:1-8](file://app/utils/security.py#L1-L8)
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
-- [app/templates/kb/detail.html:1-389](file://app/templates/kb/detail.html#L1-L389)
+- [app/templates/kb/detail.html:1-391](file://app/templates/kb/detail.html#L1-L391)
 - [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
 
 **章节来源**
@@ -126,7 +129,7 @@ TPL_EDIT --> BP
 - [app/utils/security.py:1-8](file://app/utils/security.py#L1-L8)
 - [app/utils/decorators.py:1-33](file://app/utils/decorators.py#L1-L33)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
-- [app/templates/kb/detail.html:1-389](file://app/templates/kb/detail.html#L1-L389)
+- [app/templates/kb/detail.html:1-391](file://app/templates/kb/detail.html#L1-L391)
 - [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
 
 ## 核心组件
@@ -136,7 +139,7 @@ TPL_EDIT --> BP
 - 工具与扩展：安全令牌生成、权限装饰器、登录管理、CSRF 保护、数据库会话。
 - 配置：数据库连接、AI 相关参数、上传与分页等全局设置。
 
-**更新** 新增DocGroup模型和分组管理功能，支持知识库内的文档分组管理，增强文档组织能力。**新增**完整的拖拽排序系统，支持组间拖拽排序和文档实时排序更新。
+**更新** 新增DocGroup模型和分组管理功能，支持知识库内的文档分组管理，增强文档组织能力。**新增**完整的拖拽排序系统，支持组间拖拽排序和文档实时排序更新。**新增** Alpine.js 交互式分组管理，提供响应式的用户界面体验。
 
 **章节来源**
 - [app/blueprints/kb.py:1-291](file://app/blueprints/kb.py#L1-L291)
@@ -336,11 +339,12 @@ R --> O["输出: 分组嵌套列表"]
 **新增** 知识库分组管理功能提供了灵活的文档组织能力：
 
 - **分组创建**：支持创建新的文档分组，自动设置排序号和默认名称。
-- **分组重命名**：允许编辑分组名称，实时更新数据库。
+- **分组重命名**：**新增**，通过 Alpine.js 实现响应式重命名功能，支持即时编辑模式切换。
 - **分组删除**：删除分组时，将分组内的所有文档移回"未分组"状态。
 - **文档移动**：支持拖拽式文档移动到不同分组，或从分组移出到未分组。
 - **权限控制**：仅具有编辑权限的用户可以进行分组管理操作。
-- **前端交互**：提供拖拽界面和表单操作，支持JSON和表单两种提交方式。
+- **前端交互**：**新增**，提供 Alpine.js 响应式界面，支持分组的展开/折叠、重命名编辑模式切换和拖拽操作。
+- **拖拽界面**：**新增**，改进的拖拽视觉反馈，包括拖拽幽灵效果和拖拽区域高亮。
 
 ```mermaid
 flowchart TD
@@ -377,9 +381,10 @@ Q --> R
 - **组排序**：支持拖拽重新排列分组顺序，通过 `/kb/<kb_id>/sort-groups` 端点异步提交排序结果。
 - **文档排序**：支持在分组内拖拽重新排列文档顺序，通过 `/kb/<kb_id>/sort-docs` 端点异步提交排序结果。
 - **跨组移动**：文档可以通过拖拽从一个分组移动到另一个分组，同时更新排序顺序。
-- **实时更新**：前端JavaScript监听拖拽事件，实时更新UI并异步提交到服务器。
-- **异步提交**：使用fetch API进行无刷新提交，提升用户体验。
+- **实时更新**：**新增**，前端 JavaScript 使用 Alpine.js 实现响应式 UI 更新，提供即时的视觉反馈。
+- **异步提交**：使用 fetch API 进行无刷新提交，提升用户体验。
 - **权限控制**：仅具有编辑权限的用户可以进行排序操作。
+- **视觉反馈**：**新增**，改进的拖拽视觉效果，包括拖拽幽灵元素、拖拽区域高亮和占位符显示。
 
 ```mermaid
 flowchart TD
@@ -402,11 +407,11 @@ N --> O["完成拖拽操作"]
 
 **图表来源**
 - [app/blueprints/kb.py:244-291](file://app/blueprints/kb.py#L244-L291)
-- [app/templates/kb/detail.html:195-389](file://app/templates/kb/detail.html#L195-L389)
+- [app/templates/kb/detail.html:195-391](file://app/templates/kb/detail.html#L195-L391)
 
 **章节来源**
 - [app/blueprints/kb.py:244-291](file://app/blueprints/kb.py#L244-L291)
-- [app/templates/kb/detail.html:195-389](file://app/templates/kb/detail.html#L195-L389)
+- [app/templates/kb/detail.html:195-391](file://app/templates/kb/detail.html#L195-L391)
 
 ### 表单验证与数据持久化
 - 新建知识库：校验名称必填与可见性合法，填充默认图标，写入数据库并闪存提示。
@@ -510,7 +515,7 @@ N --> O["完成拖拽操作"]
   - 行为：重新排序文档，支持跨组移动和排序
   - 权限：可编辑（编辑者/拥有者）
 
-**更新** 新增分组管理相关的四个路由，包括分组创建、重命名、删除和文档移动功能。**新增**完整的拖拽排序系统，包括组排序和文档排序的API端点。
+**更新** 新增分组管理相关的四个路由，包括分组创建、重命名、删除和文档移动功能。**新增**完整的拖拽排序系统，包括组排序和文档排序的API端点。**新增** Alpine.js 交互式分组管理和改进的拖拽排序体验。
 
 **章节来源**
 - [app/blueprints/kb.py:21-291](file://app/blueprints/kb.py#L21-L291)
@@ -521,8 +526,8 @@ N --> O["完成拖拽操作"]
 - 成员管理：在成员模板中提交表单至 /kb/<kb_id>/members，字段与角色校验见蓝图处理。
 - 详情页：渲染知识库详情与文档树（**支持分组模式**），根据 can_edit/can_manage 控制按钮显示，**新增分组操作界面**。
 - **解锁页面**：**新增**，在解锁模板中提交表单至 /kb/<kb_id>/unlock，输入密码后验证并设置会话状态。
-- **分组管理**：**新增**，通过拖拽将文档移动到不同分组，或通过表单操作创建、重命名、删除分组。
-- **拖拽排序**：**新增**，通过拖拽重新排列分组和文档顺序，实时更新UI并异步提交到服务器。
+- **分组管理**：**新增**，通过拖拽将文档移动到不同分组，或通过表单操作创建、重命名、删除分组。**新增** Alpine.js 响应式界面，支持分组的展开/折叠和重命名编辑模式。
+- **拖拽排序**：**新增**，通过拖拽重新排列分组和文档顺序，实时更新UI并异步提交到服务器。**新增**改进的拖拽视觉反馈和占位符显示。
 
 **章节来源**
 - [app/blueprints/kb.py:32-103](file://app/blueprints/kb.py#L32-L103)
@@ -531,7 +536,7 @@ N --> O["完成拖拽操作"]
 - [app/blueprints/kb.py:175-242](file://app/blueprints/kb.py#L175-L242)
 - [app/blueprints/kb.py:244-291](file://app/blueprints/kb.py#L244-L291)
 - [app/templates/kb/unlock.html:1-36](file://app/templates/kb/unlock.html#L1-L36)
-- [app/templates/kb/detail.html:1-389](file://app/templates/kb/detail.html#L1-L389)
+- [app/templates/kb/detail.html:1-391](file://app/templates/kb/detail.html#L1-L391)
 - [app/templates/kb/edit.html:1-78](file://app/templates/kb/edit.html#L1-L78)
 - [app/templates/doc/view.html:260-285](file://app/templates/doc/view.html#L260-L285)
 
@@ -575,7 +580,7 @@ J --> G
 - 访问控制与成员管理集中在服务层，确保视图层职责单一。
 - **新增**：密码保护功能依赖会话管理，与共享功能的会话管理机制类似。
 - **新增**：分组管理功能依赖DocGroup模型和文档服务的分组支持。
-- **新增**：拖拽排序系统依赖前端JavaScript和异步API通信。
+- **新增**：拖拽排序系统依赖前端 JavaScript 和 Alpine.js 响应式框架，以及异步 API 通信。
 - 扩展统一注入，配置集中管理，便于部署与测试。
 
 ```mermaid
@@ -591,7 +596,7 @@ KB_BP --> DEC["工具: decorators"]
 KB_SVC --> SESSION["会话管理<br/>解锁状态"]
 DOC_SVC --> GROUPS["分组管理<br/>DocGroup模型"]
 KB_BP --> SORT_API["排序API<br/>sort_groups/sort_docs"]
-KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
+KB_BP --> FRONTEND_JS["前端JS + Alpine.js<br/>拖拽排序 + 响应式UI"]
 ```
 
 **图表来源**
@@ -623,10 +628,12 @@ KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
 - 文档树构建：先按父节点分组再递归，时间复杂度与文档层级深度相关，建议控制层级与批量查询。
 - **新增**：分组查询优化：分组查询按排序号和创建时间排序，支持快速定位。
 - **新增**：排序操作优化：拖拽排序采用异步提交，避免阻塞UI线程，提升用户体验。
+- **新增**：Alpine.js 优化：响应式更新只影响必要的DOM元素，减少重绘重排。
+- **新增**：拖拽性能优化：前端使用 requestAnimationFrame 处理拖拽动画，确保60fps流畅度。
 - 数据库事务：单次请求内多次写入合并提交，减少往返开销。
 - 缓存策略：可在服务层引入轻量缓存（如成员角色与可访问性结果）以降低重复查询成本。
 - **新增**：会话存储优化：解锁状态存储在会话中，避免频繁的数据库查询。
-- **新增**：拖拽操作优化：前端使用fetch API进行异步操作，提升用户体验。
+- **新增**：拖拽操作优化：前端使用 fetch API 进行异步操作，提升用户体验。
 
 ## 故障排查指南
 - 403 禁止访问：确认当前用户是否满足访问条件（登录、超级管理员、拥有者、成员）。
@@ -640,6 +647,8 @@ KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
 - **新增**：文档移动失败：确认目标分组存在且属于同一知识库，检查拖拽操作的JSON格式。
 - **新增**：拖拽排序失败：确认用户具有编辑权限，检查排序数组格式，确保分组ID和文档ID有效。
 - **新增**：异步提交失败：检查网络连接，确认API端点可用，查看浏览器开发者工具中的错误信息。
+- **新增**：Alpine.js 交互异常：确认 Alpine.js 版本兼容性，检查 x-data 和 x-show 指令的语法正确性。
+- **新增**：拖拽视觉反馈问题：检查 CSS 样式是否正确加载，确认拖拽幽灵元素和高亮样式的优先级。
 
 **章节来源**
 - [app/blueprints/kb.py:14-18](file://app/blueprints/kb.py#L14-L18)
@@ -649,7 +658,7 @@ KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
 ## 结论
 知识库蓝图通过清晰的分层设计实现了完整的 CRUD 与权限控制：以服务层为核心组织访问控制与成员管理，以蓝图路由承载用户交互，以模型层表达领域实体，辅以扩展与配置保障运行稳定性。
 
-**更新** 新增的知识库分组管理功能显著增强了系统的文档组织能力，支持灵活的分组创建、重命名、删除和文档移动操作。**新增**完整的拖拽排序系统提供了直观的排序体验，支持组间拖拽排序和文档实时排序更新。密码保护功能与分组管理相结合，为用户提供更精细的访问控制策略。该设计易于扩展新功能（如文档分享、RAG 索引等）并保持良好的可维护性。
+**更新** 新增的知识库分组管理功能显著增强了系统的文档组织能力，支持灵活的分组创建、重命名、删除和文档移动操作。**新增**完整的拖拽排序系统提供了直观的排序体验，支持组间拖拽排序和文档实时排序更新。**新增** Alpine.js 交互式分组管理和改进的拖拽排序体验，提供更直观的用户界面。密码保护功能与分组管理相结合，为用户提供更精细的访问控制策略。该设计易于扩展新功能（如文档分享、RAG 索引等）并保持良好的可维护性。
 
 ## 附录
 - 安全令牌：提供 URL 安全的随机令牌生成工具，适用于分享链接等场景。
@@ -657,6 +666,8 @@ KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
 - **新增**：会话管理：提供统一的会话状态管理机制，支持知识库解锁状态和文档分享状态的跟踪。
 - **新增**：分组管理：提供完整的文档分组生命周期管理，包括创建、重命名、删除和文档移动等操作。
 - **新增**：拖拽排序：提供完整的拖拽排序系统，支持组排序和文档排序的异步提交机制。
+- **新增**：Alpine.js 响应式界面：提供交互式的分组管理界面，支持展开/折叠、重命名编辑模式切换等功能。
+- **新增**：拖拽视觉反馈：改进的拖拽体验，包括拖拽幽灵效果、占位符显示和拖拽区域高亮。
 
 **章节来源**
 - [app/utils/security.py:5-7](file://app/utils/security.py#L5-L7)
@@ -665,3 +676,5 @@ KB_BP --> FRONTEND_JS["前端JS<br/>拖拽排序"]
 - [app/blueprints/share.py:11-19](file://app/blueprints/share.py#L11-L19)
 - [app/blueprints/kb.py:175-242](file://app/blueprints/kb.py#L175-L242)
 - [app/blueprints/kb.py:244-291](file://app/blueprints/kb.py#L244-L291)
+- [app/templates/kb/detail.html:68-146](file://app/templates/kb/detail.html#L68-L146)
+- [app/templates/kb/detail.html:195-391](file://app/templates/kb/detail.html#L195-L391)

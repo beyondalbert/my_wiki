@@ -6,6 +6,7 @@ from .system_config import SystemConfig
 from .ai_kb import (
     AIKnowledgeBase,
     AIKBSource,
+    AIKBSourceKind,
     AIKBArticle,
     AIKBLink,
     AIKBChunk,
@@ -32,6 +33,7 @@ __all__ = [
     "SystemConfig",
     "AIKnowledgeBase",
     "AIKBSource",
+    "AIKBSourceKind",
     "AIKBArticle",
     "AIKBLink",
     "AIKBChunk",

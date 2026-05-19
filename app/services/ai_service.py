@@ -94,23 +94,42 @@ class LLMClient:
         resp = self.client.chat.completions.create(**kwargs)
         return resp.choices[0].message.content or ""
 
+    def chat_with_image(self, prompt: str, image_data_url: str, *,
+                        temperature: float = 0.2) -> str:
+        """多模态调用：传入 data: URL 的图片（OpenAI vision 兼容接口）。
+
+        调用者需保证 self.model 是支持 vision 的型号（如 qwen-vl-plus / gpt-4o）。
+        """
+        resp = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": image_data_url}},
+                ],
+            }],
+            temperature=temperature,
+        )
+        return resp.choices[0].message.content or ""
+
 
 # ---------------------------------------------------------------------------
 # Wiki Builder
 # ---------------------------------------------------------------------------
 
-WIKI_SYSTEM_PROMPT = """你是个人知识库 Wiki 编辑助手，参考 Andrej Karpathy 的 LLM Wiki 方法论：
-- 输出纯 markdown 的 wiki 条目；
-- 一句话 Summary 概括核心；
-- 给出 3-6 个 Tag（短小精悍，英文/中文皆可）；
-- 在正文里使用 [[相关条目标题]] 形式标注与其它条目的关联（可推断的相关概念，不一定真实存在，后续会自动校验）；
-- 末尾 Related Notes 列出 2-6 个 [[相关条目]]；
-- 不要编造原始文档没有的关键事实；
-- 输出严格 JSON，按给定 schema。
+WIKI_SYSTEM_PROMPT = """你是 Karpathy LLM Wiki 风格的个人知识库编辑助手。核心原则：
+1. 一篇原始文档可能包含多个独立概念，请拆分为多个 wiki 条目，每个条目只聊一个概念（原子化）。
+2. 对只讲一个主题的短文档，输出 1 个条目即可；长文可以拆 2~6 个。
+3. 每个条目的 title 要是可被双链复用的“概念名/术语名”，不要带文档原始标题前缀。
+4. aliases 必须列出常见同义词/缩写/中英文对照，用于后续概念去重。
+5. 正文使用 [[相关条目标题]] 标注与其它概念的关联，可推断但不要编造事实。
+6. 末尾 Related Notes 列出 2~6 个 [[相关概念]]。
+7. 严格输出 JSON，不要包装 markdown 代码块。
 """
 
 
-WIKI_USER_TEMPLATE = """请将下面这篇用户原始文档改写为一条 wiki 条目。
+WIKI_USER_TEMPLATE = """请将下面这篇用户原始文档重写为 1 到多条 wiki 条目（原子化拆分不同概念）。
 
 原始标题：{title}
 原始内容（markdown / 纯文本）：
@@ -118,14 +137,18 @@ WIKI_USER_TEMPLATE = """请将下面这篇用户原始文档改写为一条 wiki
 {content}
 ---
 
-请按以下 JSON 结构返回：
+请严格按以下 JSON 结构返回（articles 必为数组）：
 {{
-  "title": "wiki 条目标题，可适度精炼",
-  "aliases": ["可选的别名/同义词，用于双链解析", "..."],
-  "summary": "一句话概述",
-  "tags": ["tag1", "tag2"],
-  "content_md": "正文 markdown，可包含小节、列表、代码块等；可使用 [[相关条目]] 引用其它概念",
-  "related": ["相关条目标题1", "相关条目标题2"]
+  "articles": [
+    {{
+      "title": "概念名（可作为双链错）",
+      "aliases": ["同义词1", "缩写", "英文名"],
+      "summary": "一句话概述",
+      "tags": ["tag1", "tag2"],
+      "content_md": "正文 markdown，可包含小节/列表/代码块；可使用 [[相关条目]] 引用其它概念",
+      "related": ["相关概念1", "相关概念2"]
+    }}
+  ]
 }}"""
 
 
@@ -154,21 +177,48 @@ def _safe_json_loads(text: str) -> dict:
         raise
 
 
-def build_article_from_document(llm: LLMClient, doc: Document) -> WikiArticleDraft:
-    raw = doc.plain_text or extract_markdown(doc.content_json or "") or ""
-    raw = raw[:8000]  # safety cap
-    user_msg = WIKI_USER_TEMPLATE.format(title=doc.title or "未命名", content=raw or "(空文档)")
+def build_articles_from_text(llm: LLMClient, *, title: str, raw_text: str) -> list[WikiArticleDraft]:
+    """通用抽取：给定标题 + 纯文本 → 1~N 个 wiki 条目。"""
+    raw = (raw_text or "")[:8000]
+    user_msg = WIKI_USER_TEMPLATE.format(title=title or "未命名", content=raw or "(空)")
     text = llm.chat(WIKI_SYSTEM_PROMPT, user_msg, temperature=0.3,
                     response_format={"type": "json_object"})
     data = _safe_json_loads(text)
-    return WikiArticleDraft(
-        title=(data.get("title") or doc.title or "未命名").strip(),
-        aliases=[str(x).strip() for x in (data.get("aliases") or []) if str(x).strip()],
-        summary=(data.get("summary") or "").strip(),
-        tags=[str(x).strip().lstrip("#") for x in (data.get("tags") or []) if str(x).strip()],
-        content_md=(data.get("content_md") or "").strip(),
-        related=[str(x).strip() for x in (data.get("related") or []) if str(x).strip()],
-    )
+    items = data.get("articles")
+    if not items and isinstance(data, dict) and data.get("title"):
+        items = [data]
+    if not items:
+        raise RuntimeError("LLM 未返回有效的 wiki 条目")
+    drafts: list[WikiArticleDraft] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        t = (item.get("title") or "").strip()
+        if not t:
+            continue
+        drafts.append(WikiArticleDraft(
+            title=t,
+            aliases=[str(x).strip() for x in (item.get("aliases") or []) if str(x).strip()],
+            summary=(item.get("summary") or "").strip(),
+            tags=[str(x).strip().lstrip("#") for x in (item.get("tags") or []) if str(x).strip()],
+            content_md=(item.get("content_md") or "").strip(),
+            related=[str(x).strip() for x in (item.get("related") or []) if str(x).strip()],
+        ))
+    if not drafts:
+        raise RuntimeError("LLM 返回的条目全部为空")
+    return drafts
+
+
+def build_articles_from_document(llm: LLMClient, doc: Document) -> list[WikiArticleDraft]:
+    """Karpathy 式原子化抽取：一篇源文档 → 1~N 个 wiki 条目。"""
+    raw = doc.plain_text or extract_markdown(doc.content_json or "") or ""
+    return build_articles_from_text(llm, title=doc.title or "未命名", raw_text=raw)
+
+
+# Backwards-compat single-article helper (still used by regenerate_one_async)
+def build_article_from_document(llm: LLMClient, doc: Document) -> WikiArticleDraft:
+    drafts = build_articles_from_document(llm, doc)
+    return drafts[0]
 
 
 def _slug_for(title: str, ai_kb_id: str) -> str:
@@ -211,14 +261,88 @@ def _write_article_file(ai_kb: AIKnowledgeBase, article: AIKBArticle) -> None:
     path.write_text(body, encoding="utf-8")
 
 
-def upsert_article(ai_kb: AIKnowledgeBase, draft: WikiArticleDraft, source_doc_id: str) -> AIKBArticle:
-    article = AIKBArticle.query.filter_by(ai_kb_id=ai_kb.id, title=draft.title).first()
+def _find_existing_article(ai_kb_id: str, draft: WikiArticleDraft) -> AIKBArticle | None:
+    """跨文档概念合并查找：依次按
+    1) title 精确匹配
+    2) title 大小写忽略匹配
+    3) draft.title 命中某个现有条目的 alias
+    4) draft.aliases 中任一项命中某个现有条目的 title/alias
+    """
+    title = (draft.title or "").strip()
+    if not title:
+        return None
+    # 1) 精确 title
+    hit = AIKBArticle.query.filter_by(ai_kb_id=ai_kb_id, title=title).first()
+    if hit:
+        return hit
+    # 全量扫（个人知识库量级较小，不设索引成本可接受）
+    title_lc = title.lower()
+    new_alias_set = {a.lower() for a in draft.aliases if a}
+    new_alias_set.add(title_lc)
+    for art in AIKBArticle.query.filter_by(ai_kb_id=ai_kb_id).all():
+        # 2) title 大小写忽略
+        if (art.title or "").lower() == title_lc:
+            return art
+        # 3) + 4) alias 交集
+        try:
+            art_aliases = {str(a).lower() for a in json.loads(art.aliases_json or "[]") if a}
+        except Exception:
+            art_aliases = set()
+        art_aliases.add((art.title or "").lower())
+        if new_alias_set & art_aliases:
+            return art
+    return None
+
+
+def _merge_content(old_md: str, new_md: str, source_title: str) -> str:
+    """概念合并：保留原正文，追加「补充从 <源>」小节。"""
+    old = (old_md or "").rstrip()
+    new = (new_md or "").strip()
+    if not new:
+        return old
+    if not old:
+        return new
+    # 如果新内容完全被旧内容包含，跳过
+    if new in old:
+        return old
+    header = f"\n\n## 补充来源：{source_title}\n\n"
+    return old + header + new
+
+
+def upsert_article(ai_kb: AIKnowledgeBase, draft: WikiArticleDraft, source_doc_id: str,
+                   source_title: str = "") -> AIKBArticle:
+    article = _find_existing_article(ai_kb.id, draft)
     if article:
-        article.summary = draft.summary
-        article.tags_json = json.dumps(draft.tags, ensure_ascii=False)
-        article.aliases_json = json.dumps(draft.aliases, ensure_ascii=False)
-        article.content_md = draft.content_md
-        srcs = json.loads(article.source_doc_ids_json or "[]")
+        # 概念合并：aliases / tags / sources 取并集；content 追加；summary 保留较长者
+        try:
+            old_aliases = set(json.loads(article.aliases_json or "[]"))
+        except Exception:
+            old_aliases = set()
+        # 原 title 与新 title 不一致时，把新 title 也存为别名，以便后续双链解析
+        if draft.title and draft.title != article.title:
+            old_aliases.add(draft.title)
+        old_aliases.update(draft.aliases or [])
+        # 过滤掉与 title 重复的别名
+        old_aliases = {a for a in old_aliases if a and a != article.title}
+        article.aliases_json = json.dumps(sorted(old_aliases), ensure_ascii=False)
+
+        try:
+            old_tags = set(json.loads(article.tags_json or "[]"))
+        except Exception:
+            old_tags = set()
+        old_tags.update(draft.tags or [])
+        article.tags_json = json.dumps(sorted(old_tags), ensure_ascii=False)
+
+        if draft.summary and len(draft.summary) > len(article.summary or ""):
+            article.summary = draft.summary
+
+        article.content_md = _merge_content(article.content_md or "", draft.content_md or "",
+                                            source_title or "原文档")
+
+        try:
+            srcs = json.loads(article.source_doc_ids_json or "[]")
+        except Exception:
+            srcs = []
         if source_doc_id not in srcs:
             srcs.append(source_doc_id)
         article.source_doc_ids_json = json.dumps(srcs)
@@ -304,18 +428,35 @@ def article_resolver(ai_kb_id: str):
 # ---------------------------------------------------------------------------
 
 def _process_one_source(llm: LLMClient, ai_kb: AIKnowledgeBase, src: AIKBSource) -> None:
+    from ..models import AIKBSourceKind
+    from ..utils.extract_upload import extract_text_from_upload
+
     src.status = AIKBSourceStatus.PROCESSING.value
     src.err_msg = ""
     db.session.commit()
     try:
-        doc = src.document
-        if doc is None or doc.is_deleted:
-            raise RuntimeError("源文档不存在或已被删除")
-        raw = doc.plain_text or extract_markdown(doc.content_json or "") or ""
-        if not raw.strip():
-            raise RuntimeError("源文档内容为空，无法生成 Wiki 条目")
-        draft = build_article_from_document(llm, doc)
-        upsert_article(ai_kb, draft, source_doc_id=doc.id)
+        if src.kind == AIKBSourceKind.UPLOAD.value:
+            # 外部上传件：先抽取为纯文本，再走通用 wiki 化
+            up_path = src.upload_path or ""
+            if not up_path:
+                raise RuntimeError("上传文件路径丢失")
+            full_path = str(Path(current_app.instance_path) / up_path) if not Path(up_path).is_absolute() else up_path
+            raw = extract_text_from_upload(full_path, src.upload_filename or up_path, llm=llm)
+            drafts = build_articles_from_text(llm, title=src.upload_filename or "上传文档", raw_text=raw)
+            # 上传件没有 doc_id，用 "upload:<source_id>" 作为 source_doc_id 标识以避免空值
+            for d in drafts:
+                upsert_article(ai_kb, d, source_doc_id=f"upload:{src.id}",
+                               source_title=src.upload_filename or "上传文档")
+        else:
+            doc = src.document
+            if doc is None or doc.is_deleted:
+                raise RuntimeError("源文档不存在或已被删除")
+            raw = doc.plain_text or extract_markdown(doc.content_json or "") or ""
+            if not raw.strip():
+                raise RuntimeError("源文档内容为空，无法生成 Wiki 条目")
+            drafts = build_articles_from_document(llm, doc)
+            for d in drafts:
+                upsert_article(ai_kb, d, source_doc_id=doc.id, source_title=doc.title or "原文档")
         src.status = AIKBSourceStatus.PROCESSED.value
     except Exception as e:
         src.status = AIKBSourceStatus.FAILED.value

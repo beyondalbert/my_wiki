@@ -19,11 +19,16 @@
 - [app/templates/ai/index.html](file://app/templates/ai/index.html)
 - [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
 - [app/templates/ai/new.html](file://app/templates/ai/new.html)
+- [app/templates/ai/sources.html](file://app/templates/ai/sources.html)
+- [app/templates/ai/sourcess.html](file://app/templates/ai/sourcess.html)
+- [app/templates/doc/view.html](file://app/templates/doc/view.html)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 更新AI知识库蓝图路由文档以反映 /new 路由方法扩展
+- 新增文档到AI知识库集成功能的详细说明
+- 新增失败文档重试机制路由的完整文档
+- 更新AI知识库蓝图路由文档以反映新增的 /ai/new 路由方法扩展
 - 新增GET和POST方法支持的详细说明，提升用户体验
 - 补充AI知识库创建表单的完整交互流程
 - 更新RESTful API定义和调用示例
@@ -121,13 +126,13 @@ DOCS --> DOCM
   - 开放AI相关配置项、CSRF与登录管理、蓝图注册
 
 **章节来源**
-- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
+- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+- [app/blueprints/doc.py:20-231](file://app/blueprints/doc.py#L20-L231)
 - [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
-- [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
+- [app/models/ai_kb.py:8-122](file://app/models/ai_kb.py#L8-L122)
 - [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 - [app/config.py:15-83](file://app/config.py#L15-L83)
@@ -159,11 +164,11 @@ A-->>C : "重定向并提示任务已启动"
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
+- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 **章节来源**
-- [app/blueprints/ai.py:145-176](file://app/blueprints/ai.py#L145-L176)
+- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 ## 详细组件分析
@@ -178,6 +183,7 @@ A-->>C : "重定向并提示任务已启动"
   - GET /ai/<int:ai_kb_id>/sources：选择源文档（仅显示当前用户可访问的文档）
   - POST /ai/<int:ai_kb_id>/sources/add：批量添加源文档
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源文档
+  - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/retry：重试失败的源文档
   - POST /ai/<int:ai_kb_id>/build：触发构建（可选仅处理待处理/失败）
   - GET /ai/<int:ai_kb_id>/status：返回构建状态、错误、计数与最后构建时间
   - GET /ai/<int:ai_kb_id>/wiki：Wiki首页（按标签分组）
@@ -192,7 +198,7 @@ A-->>C : "重定向并提示任务已启动"
 - 数据模型
   - AI知识库、源文档、文章、链接、分块（可选RAG）
 
-**更新** 新增GET方法支持AI知识库创建表单直接访问，提升用户体验
+**更新** 新增GET方法支持AI知识库创建表单直接访问，提升用户体验；新增失败文档重试机制路由
 
 ```mermaid
 flowchart TD
@@ -212,9 +218,9 @@ Error --> Redirect["重定向回创建页"]
 - [app/templates/ai/new.html:6-31](file://app/templates/ai/new.html#L6-L31)
 
 **章节来源**
-- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
+- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
-- [app/models/ai_kb.py:8-121](file://app/models/ai_kb.py#L8-L121)
+- [app/models/ai_kb.py:8-122](file://app/models/ai_kb.py#L8-L122)
 
 ### 知识库蓝图（/kb）
 - 路由与职责
@@ -240,12 +246,13 @@ Error --> Redirect["重定向回创建页"]
 ### 文档蓝图（/doc）
 - 路由与职责
   - POST /doc/new：创建文档（校验知识库与编辑权限）
-  - GET /doc/<int:doc_id>：文档视图（含大纲）
+  - GET /doc/<int:doc_id>：文档视图（含大纲、AI知识库快捷加入）
   - GET /doc/<int:doc_id>/edit：文档编辑页
   - POST /doc/<int:doc_id>/save：保存JSON内容（标题、内容、隐私）
   - POST /doc/<int:doc_id>/delete：软删除文档及其后代
   - GET/POST /doc/<int:doc_id>/share：生成分享链接（可选密码、有效期）
   - POST /doc/share/<int:share_id>/revoke：撤销分享
+  - POST /doc/<int:doc_id>/add-to-ai-kb：将文档快速添加到AI知识库
 - 权限控制
   - 视图与编辑需具备编辑权限；分享与撤销需具备编辑权限
 - 关键服务
@@ -253,8 +260,10 @@ Error --> Redirect["重定向回创建页"]
 - 数据模型
   - 文档、分享（含密码哈希、过期、失效）
 
+**更新** 新增文档到AI知识库的快捷加入功能，允许用户从文档视图直接添加到多个AI知识库
+
 **章节来源**
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+- [app/blueprints/doc.py:20-231](file://app/blueprints/doc.py#L20-L231)
 - [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
@@ -295,21 +304,25 @@ E --> |是| OK["允许访问"]
   - 若需实时状态推送，可在AI构建状态查询接口基础上引入WebSocket（如Flask-SocketIO），在构建状态变更时推送至订阅客户端
 
 **章节来源**
-- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
+- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
 
 ### 文件上传、批量处理与进度跟踪
 - 文件上传
   - 文档内容通过JSON保存接口提交；未见独立文件上传路由
 - 批量处理
   - 源文档批量添加：POST /ai/<int:ai_kb_id>/sources/add 接收多个doc_ids
+  - 文档快速加入AI知识库：POST /doc/<int:doc_id>/add-to-ai-kb 接收ai_kb_id
 - 进度跟踪
   - 通过状态查询接口轮询构建状态与计数
   - 源文档状态枚举：PENDING、PROCESSING、PROCESSED、FAILED
 
+**更新** 新增文档快速加入AI知识库的批量处理功能
+
 **章节来源**
 - [app/blueprints/ai.py:110-128](file://app/blueprints/ai.py#L110-L128)
-- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
-- [app/models/ai_kb.py:15-19](file://app/models/ai_kb.py#L15-L19)
+- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/doc.py:205-230](file://app/blueprints/doc.py#L205-L230)
+- [app/models/ai_kb.py:16-21](file://app/models/ai_kb.py#L16-L21)
 
 ### RESTful API定义与调用示例
 - AI知识库（/ai）
@@ -321,6 +334,7 @@ E --> |是| OK["允许访问"]
   - GET /ai/<int:ai_kb_id>/sources：返回可选源文档列表
   - POST /ai/<int:ai_kb_id>/sources/add：表单字段 doc_ids（多选）
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源文档
+  - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/retry：重试失败的源文档
   - POST /ai/<int:ai_kb_id>/build：表单字段 scope（默认仅待处理）
   - GET /ai/<int:ai_kb_id>/status：返回 {status, error, last_built_at, sources, articles}
   - GET /ai/<int:ai_kb_id>/wiki：返回文章列表与标签分组
@@ -338,19 +352,20 @@ E --> |是| OK["允许访问"]
   - POST /kb/<int:kb_id>/members/<int:user_id>/delete：移除成员
 - 文档（/doc）
   - POST /doc/new：表单字段 kb_id, parent_id, type, privacy, title
-  - GET /doc/<int:doc_id>：返回视图页
+  - GET /doc/<int:doc_id>：返回视图页（含AI知识库快捷加入）
   - GET /doc/<int:doc_id>/edit：返回编辑页
   - POST /doc/<int:doc_id>/save：JSON payload {title, content_json, privacy}
   - POST /doc/<int:doc_id>/delete：软删除
   - GET/POST /doc/<int:doc_id>/share：表单字段 password, ttl_hours
   - POST /doc/share/<int:share_id>/revoke：撤销分享
+  - POST /doc/<int:doc_id>/add-to-ai-kb：表单字段 ai_kb_id
 
-**更新** 新增GET/POST方法支持，特别是 /ai/new 路由现在同时支持GET和POST方法
+**更新** 新增GET/POST方法支持，特别是 /ai/new 路由现在同时支持GET和POST方法；新增文档到AI知识库的快捷加入API
 
 **章节来源**
-- [app/blueprints/ai.py:27-281](file://app/blueprints/ai.py#L27-L281)
+- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
+- [app/blueprints/doc.py:20-231](file://app/blueprints/doc.py#L20-L231)
 
 ### 请求响应格式与错误码
 - 成功响应
@@ -364,12 +379,14 @@ E --> |是| OK["允许访问"]
   - AI聊天输入为空：返回 {ok: false, error: "请输入问题"}
   - 构建任务已在运行：页面提示"正在生成，请稍候"
   - 创建AI知识库名称为空：页面提示"请输入名称"
+  - 重试失败文档：页面提示"已重置该文档为待处理..."
 
-**更新** 新增创建AI知识库名称验证错误处理
+**更新** 新增创建AI知识库名称验证错误处理；新增重试失败文档的错误处理
 
 **章节来源**
-- [app/blueprints/ai.py:267-281](file://app/blueprints/ai.py#L267-L281)
-- [app/blueprints/ai.py:145-158](file://app/blueprints/ai.py#L145-L158)
+- [app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
+- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/blueprints/doc.py:205-230](file://app/blueprints/doc.py#L205-L230)
 
 ### 参数验证规则与安全考虑
 - 参数验证
@@ -397,12 +414,17 @@ E --> |是| OK["允许访问"]
   - 通过AJAX调用/status、/chat等接口，返回JSON数据驱动前端交互
 - 实时通信
   - 当前未实现WebSocket；可通过引入SocketIO在构建状态变化时推送消息
+- 文档到AI知识库集成
+  - 在文档视图中提供AI知识库快捷加入按钮，支持一键添加到多个知识库
+
+**更新** 新增文档到AI知识库的前端集成说明
 
 **章节来源**
 - [app/blueprints/ai.py:29](file://app/blueprints/ai.py#L29)
-- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
+- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
 - [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
 - [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
+- [app/templates/doc/view.html:152-184](file://app/templates/doc/view.html#L152-L184)
 
 ## 依赖分析
 - 蓝图到服务层
@@ -462,6 +484,7 @@ CFG --> APP["应用工厂"]
   - 构建失败：查看AI知识库错误信息字段，定位具体异常
   - 聊天无结果：确认知识库已生成文章，或开启RAG后提供有效模型配置
   - 创建失败：检查名称是否为空，查看错误提示
+  - 重试失败文档：确认文档状态已重置为待处理
 - 调试步骤
   - 查看状态接口返回的错误信息与最后构建时间
   - 检查源文档状态是否全部为PROCESSED
@@ -471,15 +494,15 @@ CFG --> APP["应用工厂"]
   - 关注数据库慢查询与锁等待
   - 对接日志系统记录关键事件（构建开始/结束、失败原因）
 
-**更新** 新增创建AI知识库失败的调试指导
+**更新** 新增创建AI知识库失败的调试指导；新增重试失败文档的故障排查
 
 **章节来源**
-- [app/blueprints/ai.py:161-175](file://app/blueprints/ai.py#L161-L175)
+- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/config.py:37-47](file://app/config.py#L37-L47)
 
 ## 结论
-AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。最新的 /ai/new 路由方法扩展显著提升了用户体验，允许直接访问AI知识库创建表单。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
+AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。最新的 /ai/new 路由方法扩展显著提升了用户体验，允许直接访问AI知识库创建表单。新增的文档到AI知识库集成功能进一步简化了工作流程，用户可以直接从文档视图界面快速添加到多个知识库。失败文档重试机制提供了更好的容错能力。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
 
 ## 附录
 - 配置项要点

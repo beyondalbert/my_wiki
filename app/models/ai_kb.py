@@ -44,8 +44,13 @@ class AIKnowledgeBase(db.Model):
         return f"<AIKnowledgeBase {self.id} {self.name}>"
 
 
+class AIKBSourceKind(str, Enum):
+    DOCUMENT = "document"   # 关联现有知识库文档
+    UPLOAD = "upload"       # 上传的外部文件（PDF/Word/文本/图片等）
+
+
 class AIKBSource(db.Model):
-    """已加入 AI 知识库的源文档。"""
+    """已加入 AI 知识库的源文档（可为关联文档或外部上传件）。"""
     __tablename__ = "ai_kb_sources"
     __table_args__ = (
         db.UniqueConstraint("ai_kb_id", "doc_id", name="uq_aikb_doc"),
@@ -53,7 +58,18 @@ class AIKBSource(db.Model):
 
     id = db.Column(db.String(12), primary_key=True, default=generate_id)
     ai_kb_id = db.Column(db.String(12), db.ForeignKey("ai_knowledge_bases.id", ondelete="CASCADE"), nullable=False, index=True)
-    doc_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # 源类型：document | upload
+    kind = db.Column(db.String(16), default=AIKBSourceKind.DOCUMENT.value, nullable=False, index=True)
+
+    # kind=document 时使用
+    doc_id = db.Column(db.String(12), db.ForeignKey("documents.id", ondelete="CASCADE"), nullable=True, index=True)
+
+    # kind=upload 时使用
+    upload_filename = db.Column(db.String(255), default="")  # 原始文件名
+    upload_path = db.Column(db.String(500), default="")      # 服务器存储相对路径
+    upload_ext = db.Column(db.String(16), default="")        # pdf/docx/png/...
+    upload_bytes = db.Column(db.Integer, default=0)          # 字节大小
 
     status = db.Column(db.String(16), default=AIKBSourceStatus.PENDING.value, nullable=False, index=True)
     err_msg = db.Column(db.String(500), default="")
@@ -62,6 +78,14 @@ class AIKBSource(db.Model):
 
     ai_kb = db.relationship("AIKnowledgeBase", backref=db.backref("sources", lazy="dynamic", cascade="all, delete-orphan"))
     document = db.relationship("Document")
+
+    @property
+    def display_title(self) -> str:
+        if self.kind == AIKBSourceKind.UPLOAD.value:
+            return self.upload_filename or "未命名上传件"
+        if self.document:
+            return self.document.title
+        return "已删除文档"
 
 
 class AIKBArticle(db.Model):

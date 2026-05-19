@@ -16,16 +16,17 @@
 - [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
 - [app/templates/ai/wiki_home.html](file://app/templates/ai/wiki_home.html)
 - [app/templates/ai/wiki_article.html](file://app/templates/ai/wiki_article.html)
+- [app/templates/ai/sources.html](file://app/templates/ai/sources.html)
+- [app/templates/base.html](file://app/templates/base.html)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 新增完整的AI知识库蓝图实现，包含完整的CRUD操作和路由定义
-- 更新数据模型文档，包含AI知识库、源文档、文章、链接、片段的完整设计
-- 新增服务层文档，涵盖LLM客户端、Wiki构建器、链接解析器等核心组件
-- 新增前端模板文档，包含AI知识库的完整UI界面
-- 更新架构图和流程图，反映新的模块化设计
-- 新增API接口文档和前端模板说明
+- 全面重新设计AI知识库详情页面，包括改进的状态指示器和视觉反馈
+- 增强的错误报告系统，提供更详细的错误信息展示
+- 新增失败文档重试功能，支持单条源文档的重试机制
+- 改进的源文档状态管理，提供更好的用户体验
+- 完善的前端模板系统，包含完整的UI界面
 
 ## 目录
 1. [简介](#简介)
@@ -44,7 +45,7 @@
 ## 简介
 本模块实现了基于 Andrej Karpathy LLM Wiki 方法论的完整AI知识库系统，支持将多源文档转换为结构化的Markdown条目，通过双向链接构建知识图谱，并提供两种问答模式：纯关键词检索增强的问答（默认）与可选的向量检索增强（RAG）。系统采用Flask + SQLAlchemy架构，结合OpenAI兼容API进行内容改写与对话，同时保留纯文本/Markdown的轻量存储方案。
 
-**更新** 新增完整的AI知识库蓝图实现，包含用户认证、权限控制、异步构建流程和完整的前端模板系统。
+**更新** 详情页面进行了全面重新设计，包括改进的状态指示器、更好的视觉反馈、增强的错误报告和失败文档重试功能。
 
 ## 项目结构
 - **蓝图层**：AI知识库蓝图实现，包含完整的路由定义、权限控制和业务逻辑
@@ -77,6 +78,7 @@ CFG["配置: config.py<br/>应用配置"]
 end
 subgraph "模板层"
 TPL_AI["模板: ai/*.html<br/>AI知识库前端界面"]
+TPL_BASE["模板: base.html<br/>基础布局"]
 end
 BP_AI --> SVC_AI
 BP_AI --> SVC_KB
@@ -88,28 +90,31 @@ SVC_KB --> M_KB
 M_AIKB --> M_DOC
 CFG --> SVC_AI
 TPL_AI --> BP_AI
+TPL_BASE --> TPL_AI
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
-- [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
+- [app/blueprints/ai.py:1-309](file://app/blueprints/ai.py#L1-L309)
+- [app/services/ai_service.py:1-444](file://app/services/ai_service.py#L1-L444)
 - [app/services/kb_service.py:1-80](file://app/services/kb_service.py#L1-L80)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-136](file://app/utils/outline.py#L1-L136)
-- [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
+- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
 - [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
+- [app/templates/base.html:1-30](file://app/templates/base.html#L1-L30)
 
 **章节来源**
-- [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
-- [app/services/ai_service.py:1-408](file://app/services/ai_service.py#L1-L408)
+- [app/blueprints/ai.py:1-309](file://app/blueprints/ai.py#L1-L309)
+- [app/services/ai_service.py:1-444](file://app/services/ai_service.py#L1-L444)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-136](file://app/utils/outline.py#L1-L136)
-- [app/models/ai_kb.py:1-121](file://app/models/ai_kb.py#L1-L121)
+- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
 - [app/models/knowledge_base.py:1-62](file://app/models/knowledge_base.py#L1-L62)
 - [app/models/document.py:1-98](file://app/models/document.py#L1-L98)
 - [app/config.py:1-83](file://app/config.py#L1-L83)
+- [app/templates/base.html:1-30](file://app/templates/base.html#L1-L30)
 
 ## 核心组件
 - **AI知识库蓝图**：完整的Flask蓝图实现，包含创建、编辑、删除、构建、浏览、问答等所有功能
@@ -121,11 +126,11 @@ TPL_AI --> BP_AI
 - **问答接口**：默认关键词匹配 + 文章上下文检索，可选RAG增强（需启用）
 - **前端模板系统**：完整的AI知识库UI界面，包含主页、详情页、Wiki浏览、图谱、问答等
 
-**更新** 新增蓝图层的完整实现，包含用户认证、权限控制和完整的业务逻辑。
+**更新** 新增蓝图层的完整实现，包含用户认证、权限控制和完整的业务逻辑，特别是失败文档重试功能。
 
 **章节来源**
-- [app/blueprints/ai.py:18-279](file://app/blueprints/ai.py#L18-L279)
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
+- [app/blueprints/ai.py:18-309](file://app/blueprints/ai.py#L18-L309)
+- [app/models/ai_kb.py:22-122](file://app/models/ai_kb.py#L22-L122)
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [app/services/ai_service.py:147-231](file://app/services/ai_service.py#L147-L231)
 - [app/services/ai_service.py:251-290](file://app/services/ai_service.py#L251-L290)
@@ -148,7 +153,7 @@ participant SVC as "服务 : ai_service.py"
 participant LLM as "LLM客户端"
 participant FS as "文件系统"
 participant DB as "数据库"
-U->>BP : 登录并访问AI知识库
+U->>BP : 登录并访问AI知识库详情
 BP->>BP : 权限验证所有者/超级管理员
 BP->>SVC : build_wiki_async(ai_kb_id, scope)
 SVC->>DB : 设置状态为BUILDING
@@ -164,8 +169,8 @@ BP-->>U : 返回构建完成
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:143-156](file://app/blueprints/ai.py#L143-L156)
-- [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
+- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/services/ai_service.py:326-381](file://app/services/ai_service.py#L326-L381)
 - [app/services/ai_service.py:296-311](file://app/services/ai_service.py#L296-L311)
 - [app/services/ai_service.py:147-161](file://app/services/ai_service.py#L147-L161)
 - [app/services/ai_service.py:196-201](file://app/services/ai_service.py#L196-L201)
@@ -194,12 +199,12 @@ AI_KNOWLEDGE_BASES ||--o{ AI_KB_CHUNKS : "可选包含"
 ```
 
 **图表来源**
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
+- [app/models/ai_kb.py:22-122](file://app/models/ai_kb.py#L22-L122)
 - [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
 **章节来源**
-- [app/models/ai_kb.py:22-121](file://app/models/ai_kb.py#L22-L121)
+- [app/models/ai_kb.py:22-122](file://app/models/ai_kb.py#L22-L122)
 - [app/models/knowledge_base.py:19-62](file://app/models/knowledge_base.py#L19-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 
@@ -287,12 +292,12 @@ BP-->>U : 展示答案
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:265-279](file://app/blueprints/ai.py#L265-L279)
-- [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
+- [app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
+- [app/services/ai_service.py:427-444](file://app/services/ai_service.py#L427-L444)
 
 **章节来源**
-- [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
-- [app/blueprints/ai.py:251-261](file://app/blueprints/ai.py#L251-L261)
+- [app/services/ai_service.py:427-444](file://app/services/ai_service.py#L427-L444)
+- [app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
 
 ### OpenAI API集成与兼容性
 - **客户端封装**：支持自定义base_url、api_key、model，兼容OpenAI、DeepSeek、Tongyi、本地代理等
@@ -314,11 +319,41 @@ BP-->>U : 展示答案
 
 **章节来源**
 - [app/config.py:44-47](file://app/config.py#L44-L47)
-- [app/models/ai_kb.py:110-121](file://app/models/ai_kb.py#L110-L121)
-- [app/services/ai_service.py:391-408](file://app/services/ai_service.py#L391-L408)
+- [app/models/ai_kb.py:111-122](file://app/models/ai_kb.py#L111-L122)
+- [app/services/ai_service.py:427-444](file://app/services/ai_service.py#L427-L444)
+
+### 失败文档重试机制
+**更新** 新增失败文档重试功能，提供更完善的错误处理机制：
+
+- **单条重试**：支持对失败的单个源文档进行重试，重置状态为PENDING并触发增量构建
+- **批量重置**：支持对所有失败文档进行批量重试
+- **错误信息**：详细记录每个源文档的错误原因，便于诊断和修复
+- **状态同步**：重试时自动清理知识库整体错误信息，避免误导用户
+- **智能判断**：如果知识库正在构建中，重试会自动加入当前构建队列
+
+```mermaid
+flowchart TD
+A["用户点击重试"] --> B{"检查源文档状态"}
+B --> |FAILED| C["重置为PENDING"]
+B --> |PENDING/PROCESSING| D["直接返回"]
+C --> E{"检查知识库状态"}
+E --> |BUILDING| F["等待当前构建完成"]
+E --> |IDLE/READY| G["启动增量构建"]
+F --> H["构建完成后自动处理"]
+G --> I["开始处理该文档"]
+I --> J["更新状态为PROCESSED"]
+```
+
+**图表来源**
+- [app/blueprints/ai.py:146-168](file://app/blueprints/ai.py#L146-L168)
+- [app/services/ai_service.py:306-324](file://app/services/ai_service.py#L306-L324)
+
+**章节来源**
+- [app/blueprints/ai.py:146-168](file://app/blueprints/ai.py#L146-L168)
+- [app/services/ai_service.py:306-324](file://app/services/ai_service.py#L306-L324)
 
 ## 前端模板系统
-AI知识库模块包含完整的前端模板系统，提供用户友好的界面：
+**更新** AI知识库模块包含完整的前端模板系统，提供用户友好的界面，特别在详情页面进行了全面重新设计：
 
 ### 主页模板
 - **AI知识库列表**：展示用户的全部AI知识库，包含状态、描述、模型信息
@@ -326,10 +361,20 @@ AI知识库模块包含完整的前端模板系统，提供用户友好的界面
 - **快速操作**：新建按钮、查看详情链接
 
 ### 详情页模板
+**更新** 全面重新设计的详情页面，包含以下改进：
+
 - **知识库概览**：名称、描述、状态、最后构建时间
-- **源文档管理**：显示已添加的源文档列表和状态
+- **改进的状态指示器**：使用彩色徽章显示知识库状态，提供更好的视觉反馈
+- **增强的错误报告**：详细显示知识库级别的错误信息，支持错误信息折叠展开
+- **源文档管理**：显示已添加的源文档列表和状态，包含彩色状态徽章
+- **失败文档重试**：为失败的源文档提供一键重试按钮
 - **Wiki条目预览**：显示前10个Wiki条目
 - **快捷操作**：构建、图谱、问答入口
+
+### 源文档模板
+- **文档选择界面**：展示可选择的源文档，支持按知识库分组显示
+- **状态显示**：显示文档的加入状态和来源知识库
+- **批量操作**：支持批量添加文档到AI知识库
 
 ### Wiki浏览模板
 - **标签分组**：按标签分组显示所有Wiki条目
@@ -344,7 +389,8 @@ AI知识库模块包含完整的前端模板系统，提供用户友好的界面
 
 **章节来源**
 - [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
-- [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
+- [app/templates/ai/detail.html:1-127](file://app/templates/ai/detail.html#L1-L127)
+- [app/templates/ai/sources.html:1-41](file://app/templates/ai/sources.html#L1-L41)
 - [app/templates/ai/wiki_home.html:1-52](file://app/templates/ai/wiki_home.html#L1-L52)
 - [app/templates/ai/wiki_article.html:1-63](file://app/templates/ai/wiki_article.html#L1-L63)
 
@@ -420,12 +466,25 @@ AI知识库模块包含完整的前端模板系统，提供用户友好的界面
   - 路径：/ai/<ai_kb_id>/chat
   - 行为：POST提交问题，返回答案；GET加载问答页面
 
+### 失败文档重试接口
+**更新** 新增失败文档重试相关接口：
+
+- **重试失败文档**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/sources/<source_id>/retry
+  - 功能：重置失败的单个源文档为待处理并触发增量构建
+- **移除源文档**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/sources/<source_id>/remove
+  - 功能：从AI知识库移除源文档
+
 **章节来源**
 - [app/blueprints/ai.py:27-85](file://app/blueprints/ai.py#L27-L85)
 - [app/blueprints/ai.py:88-139](file://app/blueprints/ai.py#L88-L139)
 - [app/blueprints/ai.py:141-174](file://app/blueprints/ai.py#L141-L174)
 - [app/blueprints/ai.py:176-261](file://app/blueprints/ai.py#L176-L261)
 - [app/blueprints/ai.py:263-279](file://app/blueprints/ai.py#L263-L279)
+- [app/blueprints/ai.py:146-168](file://app/blueprints/ai.py#L146-L168)
 
 ## 依赖分析
 - **外部依赖**：Flask、SQLAlchemy、openai、markdown、bleach、python-slugify等
@@ -462,11 +521,15 @@ CFG --> BP["ai.py"]
 - **可选RAG**：向量检索需注意索引构建与查询延迟，建议异步预热与缓存热点问题
 - **模板渲染**：使用Jinja2模板引擎，支持缓存和压缩
 - **静态资源**：CSS和JS文件支持浏览器缓存
+- **状态缓存**：详情页面使用AJAX轮询状态，减少不必要的页面刷新
 
 ## 故障排除指南
+**更新** 增强的故障排除指南，包含失败文档重试相关内容：
+
 - **构建失败**
   - 现象：知识库状态变为FAILED，错误信息显示在状态接口
   - 排查：检查源文档是否存在、LLM API是否可用、网络连通性
+  - 处理：使用失败文档重试功能或检查错误信息详情
 - **红链过多**
   - 现象：链接解析后出现大量红链
   - 排查：确认文章标题/别名是否一致，检查[[...]]语法是否正确
@@ -482,15 +545,30 @@ CFG --> BP["ai.py"]
 - **LLM调用失败**
   - 现象：构建过程中出现API错误
   - 排查：检查OPENAI_BASE_URL、OPENAI_API_KEY配置、网络连接
+- **失败文档重试无效**
+  - 现象：重试后状态仍为FAILED
+  - 排查：检查源文档是否仍然存在、错误信息是否已清除、知识库状态是否正确
+- **状态显示异常**
+  - 现象：状态徽章颜色不正确或显示错误
+  - 排查：检查数据库状态字段值、前端样式类名
 
 **章节来源**
-- [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
-- [app/services/ai_service.py:256-257](file://app/services/ai_service.py#L256-L257)
-- [app/services/ai_service.py:394-395](file://app/services/ai_service.py#L394-L395)
+- [app/services/ai_service.py:373-377](file://app/services/ai_service.py#L373-L377)
+- [app/services/ai_service.py:320-324](file://app/services/ai_service.py#L320-L324)
+- [app/services/ai_service.py:430-431](file://app/services/ai_service.py#L430-L431)
 - [app/blueprints/ai.py:18-24](file://app/blueprints/ai.py#L18-L24)
+- [app/blueprints/ai.py:146-168](file://app/blueprints/ai.py#L146-L168)
 
 ## 结论
-该AI知识库模块以Karpathy LLM Wiki为核心思想，结合LLM自动化改写与双向链接构建知识图谱，提供开箱即用的问答能力。系统采用完整的蓝图-服务-模型-工具-模板分层设计，包含用户认证、权限控制、异步构建、完整的前端界面等企业级功能。默认实现无需向量数据库即可获得良好效果，同时为RAG增强预留了清晰的扩展路径。通过模块化设计，系统具备良好的可维护性与可扩展性。
+该AI知识库模块以Karpathy LLM Wiki为核心思想，结合LLM自动化改写与双向链接构建知识图谱，提供开箱即用的问答能力。系统采用完整的蓝图-服务-模型-工具-模板分层设计，包含用户认证、权限控制、异步构建、完整的前端界面等企业级功能。
+
+**更新** 最新版本的详情页面进行了全面重新设计，显著改进了用户体验：
+- 更直观的状态指示器和视觉反馈
+- 增强的错误报告系统，提供详细的错误信息
+- 完整的失败文档重试功能，支持单条和批量重试
+- 改进的源文档管理界面，提供更好的操作体验
+
+默认实现无需向量数据库即可获得良好效果，同时为RAG增强预留了清晰的扩展路径。通过模块化设计，系统具备良好的可维护性与可扩展性。
 
 ## 附录
 
@@ -500,6 +578,7 @@ CFG --> BP["ai.py"]
 - **低门槛**：无需复杂向量库部署，即可实现语义检索与问答
 - **可扩展**：在需要时接入向量嵌入与ChromaDB，实现更精准的语义搜索
 - **完整生态**：包含前端模板、用户界面、权限控制等完整功能
+- **完善的错误处理**：提供详细的错误报告和失败文档重试机制
 
 ### 开发者扩展方法
 - **新增提示词模板**：在服务层增加系统/用户提示词，适配不同领域
@@ -507,6 +586,7 @@ CFG --> BP["ai.py"]
 - **集成向量检索**：实现AIKBChunk的向量化与ChromaDB存储，替换默认问答为向量检索
 - **增强安全**：在Markdown渲染与LLM输入处增加内容过滤与长度限制
 - **扩展前端**：基于现有模板系统开发新的UI组件和交互功能
+- **改进错误处理**：扩展错误报告机制，提供更详细的诊断信息
 
 ### 调试技巧
 - **使用状态接口轮询构建进度**
@@ -515,3 +595,5 @@ CFG --> BP["ai.py"]
 - **逐步缩小问题范围：先验证LLM可用性，再检查数据库与文件系统**
 - **使用浏览器开发者工具检查AJAX请求和响应**
 - **验证模板渲染是否正常，检查Jinja2语法错误**
+- **测试失败文档重试功能，确保状态切换正确**
+- **监控错误信息的显示和清理机制**

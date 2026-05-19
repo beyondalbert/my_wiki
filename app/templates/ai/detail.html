@@ -10,6 +10,12 @@
     <div class="flex gap-2">
       <a href="{{ url_for('ai.sources', ai_kb_id=ai_kb.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50">管理源文档</a>
       <a href="{{ url_for('ai.wiki_home', ai_kb_id=ai_kb.id) }}" class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-500">浏览 Wiki</a>
+      <a href="{{ url_for('ai.edit_ai_kb', ai_kb_id=ai_kb.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50" title="编辑名称/描述/模型">✏️ 编辑</a>
+      <form method="post" action="{{ url_for('ai.delete_ai_kb', ai_kb_id=ai_kb.id) }}" class="inline"
+            onsubmit="return confirm('确定永久删除『{{ ai_kb.name }}』及其全部 Wiki 内容？\n(原始文档不会被删除)');">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+        <button type="submit" class="px-3 py-1.5 text-sm border border-rose-300 text-rose-600 rounded-lg hover:bg-rose-50" title="永久删除该 AI 知识库">🗑️ 删除</button>
+      </form>
     </div>
   </div>
 
@@ -46,13 +52,20 @@
 
       {# 源文档 #}
       <div class="bg-white border border-slate-200 rounded-xl p-5">
-        <h2 class="font-semibold text-slate-800 mb-3">源文档（{{ sources|length }}）</h2>
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-semibold text-slate-800">源文档（{{ sources|length }}）</h2>
+          <a href="{{ url_for('ai.sources', ai_kb_id=ai_kb.id) }}"
+             class="text-sm px-2.5 py-1 bg-violet-50 text-violet-700 border border-violet-200 rounded-lg hover:bg-violet-100">+ 添加源文档</a>
+        </div>
         {% if sources %}
           <ul class="text-sm divide-y divide-slate-100">
             {% for s in sources %}
               <li class="py-2">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-slate-700 truncate flex-1">{{ s.document.title if s.document else '已删除文档' }}</span>
+                  <span class="text-slate-700 truncate flex-1" title="{{ s.display_title }}">
+                    {% if s.kind == 'upload' %}<span class="text-xs text-violet-600 mr-1">📎</span>{% endif %}
+                    {{ s.display_title }}
+                  </span>
                   <div class="flex items-center gap-2 shrink-0">
                     {% if s.status == 'processed' %}
                       <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#ecfdf5;color:#047857;">已处理</span>

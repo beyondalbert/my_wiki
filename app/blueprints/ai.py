@@ -1,16 +1,21 @@
 """AI Knowledge Base blueprint (Karpathy LLM Wiki style)."""
 import json
+import os
+import uuid
+from pathlib import Path
 
 from flask import Blueprint, abort, current_app, flash, jsonify, redirect, render_template, request, url_for
 from flask_login import login_required, current_user
+from werkzeug.utils import secure_filename
 
 from ..extensions import db
 from ..models import (
-    AIKnowledgeBase, AIKBSource, AIKBSourceStatus, AIKBStatus,
+    AIKnowledgeBase, AIKBSource, AIKBSourceKind, AIKBSourceStatus, AIKBStatus,
     AIKBArticle, AIKBLink, KnowledgeBase, Document,
 )
 from ..services import ai_service, kb_service
 from ..utils.markdown import render_wiki_markdown
+from ..utils.extract_upload import is_supported, ALL_SUPPORTED_EXTS
 
 bp = Blueprint("ai", __name__)
 
@@ -64,11 +69,17 @@ def detail(ai_kb_id):
     return render_template("ai/detail.html", ai_kb=ai_kb, sources=sources, articles=articles, redlinks=redlinks)
 
 
-@bp.route("/<ai_kb_id>/edit", methods=["POST"])
+@bp.route("/<ai_kb_id>/edit", methods=["GET", "POST"])
 @login_required
 def edit_ai_kb(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
-    ai_kb.name = (request.form.get("name") or ai_kb.name).strip()
+    if request.method == "GET":
+        return render_template("ai/edit.html", ai_kb=ai_kb)
+    name = (request.form.get("name") or "").strip()
+    if not name:
+        flash("名称不能为空", "error")
+        return redirect(url_for("ai.edit_ai_kb", ai_kb_id=ai_kb.id))
+    ai_kb.name = name
     ai_kb.description = (request.form.get("description") or "").strip()
     ai_kb.chat_model = (request.form.get("chat_model") or "").strip()
     ai_kb.enable_rag = bool(request.form.get("enable_rag"))
@@ -81,9 +92,19 @@ def edit_ai_kb(ai_kb_id):
 @login_required
 def delete_ai_kb(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
+    name = ai_kb.name
+    # 清理本地 Wiki 目录（DB 层已 cascade，文件需手动清）
+    try:
+        import shutil
+        from pathlib import Path
+        wiki_dir = Path(current_app.config["AI_WIKI_DIR"]) / str(ai_kb.id)
+        if wiki_dir.exists():
+            shutil.rmtree(wiki_dir, ignore_errors=True)
+    except Exception:
+        current_app.logger.exception("清理 AI Wiki 目录失败")
     db.session.delete(ai_kb)
     db.session.commit()
-    flash("已删除 AI 知识库", "info")
+    flash(f"已删除 AI 知识库『{name}』", "info")
     return redirect(url_for("ai.index"))
 
 
@@ -94,17 +115,18 @@ def delete_ai_kb(ai_kb_id):
 def sources(ai_kb_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
     existing_doc_ids = {s.doc_id for s in AIKBSource.query.filter_by(ai_kb_id=ai_kb.id).all()}
-    # Show owned + member docs that user can access
+    # 按原始知识库分组（自有 + 可访问）
     my_kbs = kb_service.list_my_kbs(current_user).all()
-    kb_ids = [k.id for k in my_kbs]
-    available_docs = []
-    if kb_ids:
-        available_docs = (
-            Document.query.filter(Document.kb_id.in_(kb_ids), Document.is_deleted == False)
+    kb_docs: dict[str, list] = {}
+    for kb in my_kbs:
+        docs = (
+            Document.query.filter_by(kb_id=kb.id, is_deleted=False)
             .order_by(Document.updated_at.desc()).all()
         )
-    return render_template("ai/sources.html", ai_kb=ai_kb, existing_doc_ids=existing_doc_ids,
-                           available_docs=available_docs)
+        if docs:
+            kb_docs[kb.name] = docs
+    return render_template("ai/sources.html", ai_kb=ai_kb,
+                           existing_doc_ids=existing_doc_ids, kb_docs=kb_docs)
 
 
 @bp.route("/<ai_kb_id>/sources/add", methods=["POST"])
@@ -128,12 +150,76 @@ def add_sources(ai_kb_id):
     return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
 
 
+@bp.route("/<ai_kb_id>/sources/upload", methods=["POST"])
+@login_required
+def upload_source(ai_kb_id):
+    """上传 PDF / Word / 文本 / 图片 作为源文档。支持多文件。"""
+    ai_kb = _get_ai_kb_or_404(ai_kb_id)
+    files = request.files.getlist("files") or ([request.files.get("file")] if request.files.get("file") else [])
+    files = [f for f in files if f and f.filename]
+    if not files:
+        flash("请选择要上传的文件", "error")
+        return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
+
+    base_dir = Path(current_app.instance_path) / "ai_uploads" / str(ai_kb.id)
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    added, skipped = 0, []
+    for f in files:
+        original = f.filename or ""
+        if not is_supported(original):
+            skipped.append(f"{original}（不支持的格式）")
+            continue
+        safe = secure_filename(original) or "upload"
+        # 保证扩展名被保留（secure_filename 可能处理后丢掉）
+        ext = Path(original).suffix.lower()
+        if not safe.lower().endswith(ext):
+            safe = f"{safe}{ext}"
+        unique = f"{uuid.uuid4().hex}_{safe}"
+        full_path = base_dir / unique
+        f.save(str(full_path))
+        try:
+            size = full_path.stat().st_size
+        except OSError:
+            size = 0
+        # upload_path 存相对 instance_path 的路径，与 ai_service 拼接逻辑一致
+        rel_path = str(Path("ai_uploads") / str(ai_kb.id) / unique).replace("\\", "/")
+        src = AIKBSource(
+            ai_kb_id=ai_kb.id,
+            kind=AIKBSourceKind.UPLOAD.value,
+            doc_id=None,
+            upload_filename=original,
+            upload_path=rel_path,
+            upload_ext=ext,
+            upload_bytes=size,
+        )
+        db.session.add(src)
+        added += 1
+    db.session.commit()
+
+    if added:
+        flash(f"已上传 {added} 个文件，正在启动 Wiki 处理", "success")
+        ai_service.build_wiki_async(current_app._get_current_object(), ai_kb.id, only_pending=True)
+    if skipped:
+        flash("已跳过：" + "、".join(skipped), "warning")
+    return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
+
+
 @bp.route("/<ai_kb_id>/sources/<source_id>/remove", methods=["POST"])
 @login_required
 def remove_source(ai_kb_id, source_id):
     ai_kb = _get_ai_kb_or_404(ai_kb_id)
     src = db.session.get(AIKBSource, source_id)
     if src and src.ai_kb_id == ai_kb.id:
+        # 上传件：同时清理本地文件
+        if src.kind == AIKBSourceKind.UPLOAD.value and src.upload_path:
+            try:
+                up = Path(src.upload_path)
+                full = up if up.is_absolute() else (Path(current_app.instance_path) / up)
+                if full.exists() and full.is_file():
+                    full.unlink()
+            except Exception:
+                current_app.logger.exception("清理上传文件失败")
         db.session.delete(src)
         db.session.commit()
         flash("已移除", "info")

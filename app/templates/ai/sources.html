@@ -10,30 +10,61 @@
     <a href="{{ url_for('ai.detail', ai_kb_id=ai_kb.id) }}" class="text-sm text-slate-500 hover:text-violet-600">← 返回</a>
   </div>
 
+  <!-- 上传外部文件作为源文档 -->
+  <div class="bg-white border border-dashed border-violet-300 rounded-xl p-5 mb-6">
+    <div class="flex items-center gap-2 mb-3">
+      <span class="text-2xl">📎</span>
+      <h2 class="text-base font-semibold text-slate-800">上传外部文件</h2>
+      <span class="text-xs text-slate-400">支持 PDF / Word(.docx) / 文本(.txt/.md) / 图片(多模态 OCR)</span>
+    </div>
+    <form method="post" enctype="multipart/form-data"
+          action="{{ url_for('ai.upload_source', ai_kb_id=ai_kb.id) }}"
+          class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+      <input type="file" name="files" multiple
+             accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp"
+             class="flex-1 text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" required />
+      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 whitespace-nowrap">
+        上传并启动 Wiki 处理
+      </button>
+    </form>
+    <p class="text-xs text-slate-400 mt-2">上传后会自动抽取文本（图片走多模态大模型）并生成 Wiki 条目。</p>
+  </div>
+
+  <div class="text-sm font-semibold text-slate-700 mb-2">或，从已有知识库中选择文档</div>
   <form method="post" action="{{ url_for('ai.add_sources', ai_kb_id=ai_kb.id) }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+    {% set has_addable = false %}
     <div class="bg-white border border-slate-200 rounded-xl divide-y divide-slate-100">
       {% for kb_name, docs in (kb_docs or {}).items() %}
+        {% set addable = docs | rejectattr('id', 'in', existing_doc_ids or []) | list %}
+        {% if addable %}{% set has_addable = true %}{% endif %}
         <div class="p-4">
-          <div class="font-semibold text-slate-800 mb-2">{{ kb_name }}</div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="font-semibold text-slate-800">{{ kb_name }}</div>
+            <span class="text-xs text-slate-400">可加入 {{ addable | length }} / 共 {{ docs | length }}</span>
+          </div>
           <ul class="space-y-1">
             {% for d in docs %}
+              {% set joined = d.id in (existing_doc_ids or []) %}
               <li class="flex items-center gap-2 text-sm">
                 <input type="checkbox" name="doc_ids" value="{{ d.id }}"
-                       {{ 'disabled checked' if d.id in (existing_doc_ids or []) }}
+                       {% if joined %}disabled checked{% endif %}
                        class="rounded text-violet-600" />
-                <span class="text-slate-700">{{ d.title }}</span>
-                {% if d.id in (existing_doc_ids or []) %}<span class="text-xs text-emerald-600 ml-auto">已加入</span>{% endif %}
+                <span class="text-slate-700 truncate">{{ d.title }}</span>
+                {% if joined %}<span class="text-xs text-emerald-600 ml-auto shrink-0">已加入</span>{% endif %}
               </li>
             {% endfor %}
           </ul>
         </div>
       {% else %}
-        <div class="p-8 text-center text-slate-400">没有可加入的文档</div>
+        <div class="p-8 text-center text-slate-400">还没有可选的文档，请先去<a class="text-violet-600 hover:underline" href="{{ url_for('main.dashboard') }}">知识库</a>创建。</div>
       {% endfor %}
     </div>
-    <div class="mt-4 flex justify-end">
-      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500">加入选中文档</button>
+    <div class="mt-4 flex items-center justify-between">
+      <p class="text-xs text-slate-400">勾选后点击右侧「加入选中文档」；已加入的文档不可重复勾选。</p>
+      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 disabled:bg-slate-300 disabled:cursor-not-allowed"
+              {% if not has_addable %}disabled{% endif %}>加入选中文档</button>
     </div>
   </form>
 </div>

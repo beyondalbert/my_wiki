@@ -57,9 +57,16 @@ class LLMClient:
                  model: str | None = None):
         from . import config_service  # avoid circular import
         cfg = current_app.config
-        self.base_url = base_url or config_service.get("OPENAI_BASE_URL") or cfg.get("OPENAI_BASE_URL")
-        self.api_key = api_key or config_service.get("OPENAI_API_KEY") or cfg.get("OPENAI_API_KEY")
-        self.model = model or config_service.get("CHAT_MODEL") or cfg.get("CHAT_MODEL") or "gpt-4o-mini"
+        # DB config_service may fail in background thread if cache is cold;
+        # fall back to app.config in that case.
+        def _cfg_get(key: str) -> str:
+            try:
+                return config_service.get(key) or ""
+            except Exception:
+                return ""
+        self.base_url = base_url or _cfg_get("OPENAI_BASE_URL") or cfg.get("OPENAI_BASE_URL")
+        self.api_key = api_key or _cfg_get("OPENAI_API_KEY") or cfg.get("OPENAI_API_KEY")
+        self.model = model or _cfg_get("CHAT_MODEL") or cfg.get("CHAT_MODEL") or "gpt-4o-mini"
         self._client = None
 
     @property
@@ -304,10 +311,13 @@ def _process_one_source(llm: LLMClient, ai_kb: AIKnowledgeBase, src: AIKBSource)
         doc = src.document
         if doc is None or doc.is_deleted:
             raise RuntimeError("源文档不存在或已被删除")
+        raw = doc.plain_text or extract_markdown(doc.content_json or "") or ""
+        if not raw.strip():
+            raise RuntimeError("源文档内容为空，无法生成 Wiki 条目")
         draft = build_article_from_document(llm, doc)
         upsert_article(ai_kb, draft, source_doc_id=doc.id)
         src.status = AIKBSourceStatus.PROCESSED.value
-    except Exception as e:  # pragma: no cover - depends on external LLM
+    except Exception as e:
         src.status = AIKBSourceStatus.FAILED.value
         src.err_msg = str(e)[:480]
     db.session.commit()
@@ -315,6 +325,8 @@ def _process_one_source(llm: LLMClient, ai_kb: AIKnowledgeBase, src: AIKBSource)
 
 def build_wiki_async(app, ai_kb_id: str, *, only_pending: bool = True) -> None:
     """Run the full wiki build inside a background thread."""
+    import logging
+    logger = logging.getLogger(__name__)
 
     def _job():
         with app.app_context():
@@ -325,20 +337,41 @@ def build_wiki_async(app, ai_kb_id: str, *, only_pending: bool = True) -> None:
             ai_kb.error_msg = ""
             db.session.commit()
             try:
-                model = ai_kb.chat_model or current_app.config.get("CHAT_MODEL")
+                model = (ai_kb.chat_model or "").strip() or None
+                api_key = current_app.config.get("OPENAI_API_KEY") or ""
+                # 也查一下 DB 配置（用户可能只在系统设置里填了 key）
+                if not api_key:
+                    try:
+                        from . import config_service
+                        api_key = config_service.get("OPENAI_API_KEY") or ""
+                    except Exception:
+                        pass
+                if not api_key:
+                    raise RuntimeError(
+                        "OPENAI_API_KEY 未配置，请在系统设置中配置 API 密钥"
+                    )
                 llm = LLMClient(model=model)
+                logger.info("build_wiki start: ai_kb=%s model=%s", ai_kb_id, llm.model)
                 q = AIKBSource.query.filter_by(ai_kb_id=ai_kb.id)
                 if only_pending:
                     q = q.filter(AIKBSource.status.in_([
                         AIKBSourceStatus.PENDING.value,
                         AIKBSourceStatus.FAILED.value,
                     ]))
-                for src in q.all():
+                sources = q.all()
+                if not sources:
+                    ai_kb.status = AIKBStatus.READY.value
+                    ai_kb.error_msg = "没有待处理的源文档"
+                    db.session.commit()
+                    return
+                for src in sources:
                     _process_one_source(llm, ai_kb, src)
                 resolve_links(ai_kb)
                 ai_kb.status = AIKBStatus.READY.value
                 ai_kb.last_built_at = datetime.utcnow()
-            except Exception as e:  # pragma: no cover
+                logger.info("build_wiki done: ai_kb=%s", ai_kb_id)
+            except Exception as e:
+                logger.exception("build_wiki failed: ai_kb=%s", ai_kb_id)
                 ai_kb.status = AIKBStatus.FAILED.value
                 ai_kb.error_msg = str(e)[:480]
             db.session.commit()
@@ -363,7 +396,7 @@ def regenerate_one_async(app, ai_kb_id: str, article_id: str) -> None:
                 doc = db.session.get(Document, src_ids[0])
                 if not doc:
                     raise RuntimeError("源文档不存在")
-                llm = LLMClient(model=ai_kb.chat_model or current_app.config.get("CHAT_MODEL"))
+                llm = LLMClient(model=(ai_kb.chat_model or "").strip() or None)
                 draft = build_article_from_document(llm, doc)
                 # overwrite this article (keep slug)
                 article.title = draft.title or article.title
@@ -406,5 +439,5 @@ def chat_with_wiki(ai_kb: AIKnowledgeBase, question: str, max_articles: int = 6)
     context = "\n\n".join(
         f"# {a.title}\n{a.summary or ''}\n\n{(a.content_md or '')[:2000]}" for a in ranked
     )
-    llm = LLMClient(model=ai_kb.chat_model or current_app.config.get("CHAT_MODEL"))
+    llm = LLMClient(model=(ai_kb.chat_model or "").strip() or None)
     return llm.chat(WIKI_CHAT_SYSTEM, f"WIKI 上下文：\n{context}\n\n问题：{question}", temperature=0.2)

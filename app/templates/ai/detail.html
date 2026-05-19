@@ -15,25 +15,70 @@
 
   <div class="grid lg:grid-cols-3 gap-6">
     <div class="lg:col-span-2 space-y-6">
+      {# 构建状态 #}
       <div class="bg-white border border-slate-200 rounded-xl p-5">
         <div class="flex items-center justify-between">
-          <h2 class="font-semibold text-slate-800">构建状态：<span class="text-violet-600">{{ ai_kb.status }}</span></h2>
+          <div class="flex items-center gap-2">
+            <h2 class="font-semibold text-slate-800">构建状态</h2>
+            {% if ai_kb.status == 'ready' %}
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#ecfdf5;color:#047857;">已就绪</span>
+            {% elif ai_kb.status == 'building' %}
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#fef3c7;color:#92400e;">构建中...</span>
+            {% elif ai_kb.status == 'failed' %}
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#fee2e2;color:#b91c1c;">失败</span>
+            {% else %}
+              <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#f1f5f9;color:#475569;">空闲</span>
+            {% endif %}
+          </div>
           <form method="post" action="{{ url_for('ai.build', ai_kb_id=ai_kb.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
             <button class="px-3 py-1.5 text-sm bg-violet-600 text-white rounded-lg hover:bg-violet-500">触发构建 / 重生</button>
           </form>
         </div>
         <p class="text-sm text-slate-500 mt-2">最近构建：{{ ai_kb.last_built_at.strftime('%Y-%m-%d %H:%M') if ai_kb.last_built_at else '—' }}</p>
+        {% if ai_kb.error_msg %}
+          <div class="mt-3 p-3 rounded-lg text-sm" style="background-color:#fef2f2;color:#b91c1c;border:1px solid #fecaca;">
+            <div class="font-medium">错误信息</div>
+            <p class="mt-1">{{ ai_kb.error_msg }}</p>
+          </div>
+        {% endif %}
       </div>
 
+      {# 源文档 #}
       <div class="bg-white border border-slate-200 rounded-xl p-5">
         <h2 class="font-semibold text-slate-800 mb-3">源文档（{{ sources|length }}）</h2>
         {% if sources %}
           <ul class="text-sm divide-y divide-slate-100">
             {% for s in sources %}
-              <li class="py-2 flex items-center justify-between">
-                <span class="text-slate-700 truncate">{{ s.document.title if s.document else '已删除文档' }}</span>
-                <span class="text-xs text-slate-400">{{ s.status }}</span>
+              <li class="py-2">
+                <div class="flex items-center justify-between gap-2">
+                  <span class="text-slate-700 truncate flex-1">{{ s.document.title if s.document else '已删除文档' }}</span>
+                  <div class="flex items-center gap-2 shrink-0">
+                    {% if s.status == 'processed' %}
+                      <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#ecfdf5;color:#047857;">已处理</span>
+                    {% elif s.status == 'processing' %}
+                      <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#fef3c7;color:#92400e;">处理中</span>
+                    {% elif s.status == 'failed' %}
+                      <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#fee2e2;color:#b91c1c;">失败</span>
+                    {% else %}
+                      <span class="text-xs px-2 py-0.5 rounded-full" style="background-color:#f1f5f9;color:#475569;">待处理</span>
+                    {% endif %}
+                    {% if s.status == 'failed' %}
+                      <form method="post" action="{{ url_for('ai.retry_source', ai_kb_id=ai_kb.id, source_id=s.id) }}" class="inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <button type="submit" class="text-xs px-2 py-0.5 rounded border border-violet-300 text-violet-700 hover:bg-violet-50" title="重试生成 Wiki">重试</button>
+                      </form>
+                    {% endif %}
+                    <form method="post" action="{{ url_for('ai.remove_source', ai_kb_id=ai_kb.id, source_id=s.id) }}" class="inline" onsubmit="return confirm('确定从 AI 知识库移除该文档？\n(已生成的 Wiki 条目不会被删除，仅解除源关联)');">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                      <input type="hidden" name="next" value="detail" />
+                      <button type="submit" class="text-xs px-2 py-0.5 rounded border border-rose-300 text-rose-600 hover:bg-rose-50" title="从该 AI 知识库移除">删除</button>
+                    </form>
+                  </div>
+                </div>
+                {% if s.err_msg %}
+                  <p class="text-xs mt-1" style="color:#b91c1c;">{{ s.err_msg }}</p>
+                {% endif %}
               </li>
             {% endfor %}
           </ul>
@@ -42,6 +87,7 @@
         {% endif %}
       </div>
 
+      {# Wiki 条目 #}
       <div class="bg-white border border-slate-200 rounded-xl p-5">
         <h2 class="font-semibold text-slate-800 mb-3">Wiki 条目（{{ articles|length }}）</h2>
         {% if articles %}
@@ -70,7 +116,7 @@
       </div>
       <div class="bg-white border border-slate-200 rounded-xl p-5">
         <div class="text-sm text-slate-500">红链（未解析的双链）</div>
-        <div class="font-bold text-rose-500 text-2xl mt-1">{{ redlinks|length if redlinks else 0 }}</div>
+        <div class="font-bold text-rose-500 text-2xl mt-1">{{ redlinks if redlinks else 0 }}</div>
       </div>
       <a href="{{ url_for('ai.graph', ai_kb_id=ai_kb.id) }}" class="block text-center px-3 py-2 border border-slate-300 rounded-lg hover:bg-slate-50 text-sm">关系图</a>
       <a href="{{ url_for('ai.chat', ai_kb_id=ai_kb.id) }}" class="block text-center px-3 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 text-sm">与 Wiki 对话</a>

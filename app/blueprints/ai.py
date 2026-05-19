@@ -137,7 +137,35 @@ def remove_source(ai_kb_id, source_id):
         db.session.delete(src)
         db.session.commit()
         flash("已移除", "info")
+    nxt = (request.form.get("next") or "").strip()
+    if nxt == "detail":
+        return redirect(url_for("ai.detail", ai_kb_id=ai_kb.id))
     return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
+
+
+@bp.route("/<ai_kb_id>/sources/<source_id>/retry", methods=["POST"])
+@login_required
+def retry_source(ai_kb_id, source_id):
+    """重置失败/单条源文档为 pending 并触发增量构建。"""
+    ai_kb = _get_ai_kb_or_404(ai_kb_id)
+    src = db.session.get(AIKBSource, source_id)
+    if not src or src.ai_kb_id != ai_kb.id:
+        abort(404)
+    src.status = AIKBSourceStatus.PENDING.value
+    src.err_msg = None
+    # 若整体处于失败状态，重试单条时一并清掉整体错误，避免误导
+    if ai_kb.status == AIKBStatus.FAILED.value:
+        ai_kb.error_msg = None
+    db.session.commit()
+    if ai_kb.status == AIKBStatus.BUILDING.value:
+        flash("已重置该文档为待处理，当前正在构建中将自动处理", "success")
+    else:
+        ai_service.build_wiki_async(current_app._get_current_object(), ai_kb.id, only_pending=True)
+        flash("已开始重试该文档的 Wiki 生成", "success")
+    nxt = (request.form.get("next") or "").strip()
+    if nxt == "sources":
+        return redirect(url_for("ai.sources", ai_kb_id=ai_kb.id))
+    return redirect(url_for("ai.detail", ai_kb_id=ai_kb.id))
 
 
 # ---------- Build / Status ----------

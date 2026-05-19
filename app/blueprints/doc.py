@@ -7,8 +7,8 @@ from flask_login import login_required, current_user
 from werkzeug.utils import secure_filename
 
 from ..extensions import csrf, db
-from ..models import Document, DocGroup, KnowledgeBase, DocumentPrivacy, DocumentType, DocumentShare
-from ..services import kb_service, doc_service, share_service
+from ..models import Document, DocGroup, KnowledgeBase, DocumentPrivacy, DocumentType, DocumentShare, AIKnowledgeBase, AIKBSource, AIKBStatus
+from ..services import kb_service, doc_service, share_service, ai_service
 from ..utils.ids import generate_id
 from ..utils.outline import extract_outline
 
@@ -89,10 +89,21 @@ def view(doc_id):
         return redirect(url_for("kb.unlock", kb_id=kb.id, next=request.path))
     tree = doc_service.list_kb_doc_tree(kb.id)
     outline = extract_outline(doc.content_json)
+    # AI 知识库快捷加入
+    ai_kbs = []
+    joined_ai_kb_ids = set()
+    if current_user.is_authenticated:
+        ai_kbs = AIKnowledgeBase.query.filter_by(owner_id=current_user.id).order_by(AIKnowledgeBase.name.asc()).all()
+        joined_ai_kb_ids = {
+            s.ai_kb_id for s in AIKBSource.query.filter_by(doc_id=doc.id).all()
+            if s.ai_kb_id in {a.id for a in ai_kbs}
+        }
     return render_template(
         "doc/view.html", doc=doc, kb=kb, tree=tree, outline=outline,
         can_edit=kb_service.can_edit(current_user, kb),
         can_manage=kb_service.can_manage(current_user, kb),
+        ai_kbs=ai_kbs,
+        joined_ai_kb_ids=joined_ai_kb_ids,
     )
 
 
@@ -187,3 +198,33 @@ def revoke_share(share_id):
     share_service.revoke(s)
     flash("分享已撤销", "info")
     return redirect(url_for("doc.share", doc_id=doc.id))
+
+
+# ---------- AI 知识库快捷加入 ----------
+
+@bp.route("/<doc_id>/add-to-ai-kb", methods=["POST"])
+@login_required
+def add_to_ai_kb(doc_id):
+    """Quick-add this doc to one of user's AI knowledge bases."""
+    doc = _get_doc_or_404(doc_id)
+    ai_kb_id = (request.form.get("ai_kb_id") or "").strip()
+    if not ai_kb_id:
+        flash("请选择 AI 知识库", "error")
+        return redirect(url_for("doc.view", doc_id=doc.id))
+    ai_kb = db.session.get(AIKnowledgeBase, ai_kb_id)
+    if not ai_kb or (ai_kb.owner_id != current_user.id and not current_user.is_super_admin):
+        abort(403)
+    # Check if already added
+    existing = AIKBSource.query.filter_by(ai_kb_id=ai_kb.id, doc_id=doc.id).first()
+    if existing:
+        flash(f"该文档已在『{ai_kb.name}』中", "warning")
+        return redirect(url_for("doc.view", doc_id=doc.id))
+    db.session.add(AIKBSource(ai_kb_id=ai_kb.id, doc_id=doc.id))
+    db.session.commit()
+    # 自动触发 Wiki 生成（仅处理 pending 状态的源文档）
+    if ai_kb.status != AIKBStatus.BUILDING.value:
+        ai_service.build_wiki_async(current_app._get_current_object(), ai_kb.id, only_pending=True)
+        flash(f"已加入『{ai_kb.name}』并开始生成 Wiki，稍后可前往 AI 知识库查看", "success")
+    else:
+        flash(f"已加入『{ai_kb.name}』，当前正在生成中，完成后会自动处理", "success")
+    return redirect(url_for("doc.view", doc_id=doc.id))

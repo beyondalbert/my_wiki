@@ -149,6 +149,39 @@
                   <a href="{{ url_for('doc.share', doc_id=doc.id) }}" class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 whitespace-nowrap">分享</a>
                 {% endif %}
               {% endif %}
+              {# 加入 AI 知识库 #}
+              {% if ai_kbs %}
+              <div x-data="{ open: false }" class="relative">
+                <button @click="open = !open" type="button"
+                        class="px-3 py-1.5 text-sm border border-slate-300 rounded-lg hover:bg-slate-50 whitespace-nowrap flex items-center gap-1">
+                  <span>🤖</span><span>AI 知识库</span>
+                  <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>
+                <div x-show="open" @click.outside="open = false" x-transition x-cloak
+                     class="absolute right-0 mt-1 w-56 bg-white border border-slate-200 rounded-lg shadow-lg py-1 text-sm z-50">
+                  {% for akb in ai_kbs %}
+                    {% if akb.id in joined_ai_kb_ids %}
+                      <div class="px-3 py-2 text-slate-400 flex items-center justify-between">
+                        <span class="truncate">✅ {{ akb.name }}</span>
+                        <span class="text-xs">已加入</span>
+                      </div>
+                    {% else %}
+                      <form method="post" action="{{ url_for('doc.add_to_ai_kb', doc_id=doc.id) }}">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
+                        <input type="hidden" name="ai_kb_id" value="{{ akb.id }}" />
+                        <button type="submit" class="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center justify-between">
+                          <span class="truncate">{{ akb.name }}</span>
+                          <span class="text-xs text-indigo-600">加入</span>
+                        </button>
+                      </form>
+                    {% endif %}
+                  {% endfor %}
+                  <div class="border-t border-slate-100 mt-1 pt-1">
+                    <a href="{{ url_for('ai.new_ai_kb') }}" class="block px-3 py-2 text-indigo-600 hover:bg-slate-50">+ 新建 AI 知识库</a>
+                  </div>
+                </div>
+              </div>
+              {% endif %}
             </div>
           </div>
         </div>

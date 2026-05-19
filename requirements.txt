@@ -15,7 +15,7 @@ python-slugify==8.0.4
 Werkzeug==3.0.3
 email-validator==2.2.0
 requests==2.32.3
-openai==1.40.0
+openai>=1.55.3
 # Optional, only needed when ENABLE_RAG=true
 # chromadb==0.5.5
 # tiktoken==0.7.0

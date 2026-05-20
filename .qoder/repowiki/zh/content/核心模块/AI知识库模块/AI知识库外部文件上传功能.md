@@ -8,9 +8,18 @@
 - [app/models/ai_kb.py](file://app/models/ai_kb.py)
 - [app/templates/ai/sources.html](file://app/templates/ai/sources.html)
 - [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
+- [app/templates/base.html](file://app/templates/base.html)
 - [app/config.py](file://app/config.py)
+- [app/static/vendor/js/alpine.min.js](file://app/static/vendor/js/alpine.min.js)
 - [scripts/migrate_aikb_source_uploads.sql](file://scripts/migrate_aikb_source_uploads.sql)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 新增现代化拖拽上传界面和Alpine.js交互功能
+- 实现文件选择区的拖拽支持和实时文件管理
+- 增加多文件上传支持和文件预览功能
+- 优化用户交互体验和界面响应性
 
 ## 目录
 1. [简介](#简介)
@@ -27,11 +36,14 @@
 
 AI知识库外部文件上传功能是MyWiki项目中AI知识库模块的重要组成部分，允许用户将PDF、Word文档、文本文件和图片等外部文件作为源文档导入到AI知识库中。该功能实现了从文件上传、格式检测、内容抽取到AI Wiki化的完整工作流程。
 
+**最新更新** 新增了现代化的拖拽上传界面和Alpine.js交互功能，提供更加直观和高效的文件管理体验。
+
 该功能的核心价值在于：
 - 支持多种文件格式的统一处理
 - 通过OCR技术处理图片内容
 - 自动化的AI Wiki生成流程
 - 与现有知识库系统的无缝集成
+- 现代化的用户界面和交互体验
 
 ## 项目结构
 
@@ -51,6 +63,10 @@ end
 subgraph "前端界面"
 SOURCES_HTML[sources.html - 源文档管理]
 DETAIL_HTML[detail.html - 详情页面]
+BASE_HTML[base.html - 基础模板]
+end
+subgraph "交互框架"
+ALPINE_JS[alpine.min.js - Alpine.js]
 end
 subgraph "配置与脚本"
 CONFIG[config.py - 配置]
@@ -61,6 +77,7 @@ AI_SERVICE --> EXTRACT
 AI_SERVICE --> AI_KB_MODELS
 AI_BP --> SOURCES_HTML
 AI_BP --> DETAIL_HTML
+BASE_HTML --> ALPINE_JS
 CONFIG --> AI_BP
 MIGRATE --> AI_KB_MODELS
 ```
@@ -69,11 +86,15 @@ MIGRATE --> AI_KB_MODELS
 - [app/blueprints/ai.py:1-395](file://app/blueprints/ai.py#L1-L395)
 - [app/services/ai_service.py:1-585](file://app/services/ai_service.py#L1-L585)
 - [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
+- [app/templates/ai/sources.html:1-193](file://app/templates/ai/sources.html#L1-L193)
+- [app/templates/base.html:1-30](file://app/templates/base.html#L1-L30)
 
 **章节来源**
 - [app/blueprints/ai.py:1-395](file://app/blueprints/ai.py#L1-L395)
 - [app/services/ai_service.py:1-585](file://app/services/ai_service.py#L1-L585)
 - [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
+- [app/templates/ai/sources.html:1-193](file://app/templates/ai/sources.html#L1-L193)
+- [app/templates/base.html:1-30](file://app/templates/base.html#L1-L30)
 
 ## 核心组件
 
@@ -86,6 +107,7 @@ AI知识库外部文件上传功能由多个核心组件协同工作：
 3. **AI服务层** - 执行AI Wiki生成和处理逻辑
 4. **数据模型** - 定义数据库结构和关系
 5. **前端模板** - 提供用户交互界面
+6. **Alpine.js交互框架** - 实现现代化的前端交互
 
 ### 支持的文件格式
 
@@ -95,9 +117,19 @@ AI知识库外部文件上传功能由多个核心组件协同工作：
 - **文本文件** (.txt, .md, .markdown)
 - **图片文件** (.png, .jpg, .jpeg, .webp, .gif, .bmp)
 
+### 现代化界面特性
+
+**新增功能** 现代化的拖拽上传界面提供了以下增强功能：
+- 拖拽上传区域，支持拖放文件
+- 实时文件管理，可动态添加和删除文件
+- 文件大小格式化显示
+- 多文件上传支持
+- 响应式设计和流畅动画效果
+
 **章节来源**
 - [app/utils/extract_upload.py:15-22](file://app/utils/extract_upload.py#L15-L22)
 - [app/templates/ai/sources.html:107-111](file://app/templates/ai/sources.html#L107-L111)
+- [app/templates/ai/sources.html:88-112](file://app/templates/ai/sources.html#L88-L112)
 
 ## 架构概览
 
@@ -106,12 +138,15 @@ AI知识库外部文件上传功能采用分层架构设计，实现了清晰的
 ```mermaid
 sequenceDiagram
 participant User as 用户
+participant Alpine as Alpine.js
 participant Blueprint as AI蓝图
 participant Service as AI服务
 participant Extractor as 文件抽取器
 participant Database as 数据库
 participant LLM as 大语言模型
-User->>Blueprint : 上传文件请求
+User->>Alpine : 拖拽/选择文件
+Alpine->>Alpine : 更新文件列表
+Alpine->>Blueprint : 触发上传请求
 Blueprint->>Blueprint : 验证文件格式
 Blueprint->>Blueprint : 保存文件到服务器
 Blueprint->>Service : 触发Wiki构建
@@ -122,13 +157,15 @@ Service->>LLM : 生成AI Wiki条目
 LLM-->>Service : 返回结构化内容
 Service->>Database : 保存文章和链接
 Service-->>Blueprint : 返回处理结果
-Blueprint-->>User : 显示处理状态
+Blueprint-->>Alpine : 更新UI状态
+Alpine-->>User : 显示处理状态
 ```
 
 **图表来源**
 - [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
 - [app/services/ai_service.py:430-465](file://app/services/ai_service.py#L430-L465)
 - [app/utils/extract_upload.py:99-125](file://app/utils/extract_upload.py#L99-L125)
+- [app/templates/ai/sources.html:39-73](file://app/templates/ai/sources.html#L39-L73)
 
 ## 详细组件分析
 
@@ -138,7 +175,8 @@ Blueprint-->>User : 显示处理状态
 
 ```mermaid
 flowchart TD
-Start([开始上传]) --> ValidateFormat[验证文件格式]
+Start([开始上传]) --> AlpineUI[Alpine.js界面处理]
+AlpineUI --> ValidateFormat[验证文件格式]
 ValidateFormat --> FormatSupported{格式是否支持?}
 FormatSupported --> |否| SkipFile[跳过文件并记录]
 FormatSupported --> |是| SaveFile[保存文件到服务器]
@@ -158,6 +196,7 @@ SkipFile --> End
 **图表来源**
 - [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
 - [app/services/ai_service.py:467-522](file://app/services/ai_service.py#L467-L522)
+- [app/templates/ai/sources.html:39-73](file://app/templates/ai/sources.html#L39-L73)
 
 ### 文件格式检测机制
 
@@ -258,16 +297,21 @@ AI_KB_ARTICLES ||--o{ AI_KB_LINKS : "产生"
 - [app/utils/extract_upload.py:99-125](file://app/utils/extract_upload.py#L99-L125)
 - [app/models/ai_kb.py:52-89](file://app/models/ai_kb.py#L52-L89)
 
-### 前端用户界面
+### 现代化前端用户界面
 
-系统提供了直观的用户界面来管理外部文件上传：
+系统提供了直观且现代化的用户界面来管理外部文件上传：
 
 ```mermaid
 graph LR
-subgraph "文件上传界面"
+subgraph "现代化拖拽上传界面"
 DropZone[拖拽上传区域]
 FileList[文件列表显示]
 UploadBtn[上传按钮]
+end
+subgraph "Alpine.js交互功能"
+AlpineData[数据绑定]
+DragDrop[拖拽事件处理]
+FileManagement[文件管理]
 end
 subgraph "状态指示"
 Pending[待处理]
@@ -280,6 +324,11 @@ Retry[重试处理]
 Remove[移除文件]
 ClearAll[清空列表]
 end
+DropZone --> AlpineData
+AlpineData --> DragDrop
+AlpineData --> FileManagement
+FileList --> AlpineData
+AlpineData --> UploadBtn
 DropZone --> FileList
 FileList --> UploadBtn
 UploadBtn --> Pending
@@ -294,10 +343,12 @@ FileList --> ClearAll
 **图表来源**
 - [app/templates/ai/sources.html:38-153](file://app/templates/ai/sources.html#L38-L153)
 - [app/templates/ai/detail.html:54-101](file://app/templates/ai/detail.html#L54-L101)
+- [app/templates/base.html:12](file://app/templates/base.html#L12)
 
 **章节来源**
 - [app/templates/ai/sources.html:1-193](file://app/templates/ai/sources.html#L1-L193)
 - [app/templates/ai/detail.html:1-140](file://app/templates/ai/detail.html#L1-L140)
+- [app/templates/base.html:1-30](file://app/templates/base.html#L1-L30)
 
 ## 依赖关系分析
 
@@ -311,6 +362,10 @@ OpenAI[OpenAI SDK]
 PyPDF[Pypdf库]
 Docx[python-docx库]
 Werkzeug[Werkzeug工具]
+Alpine[Alpine.js 3.14.1]
+Tailwind[Tailwind CSS]
+Inter[Inter字体]
+Highlight[Highlight.js]
 end
 subgraph "内部模块"
 Blueprint[AI蓝图]
@@ -324,6 +379,10 @@ OpenAI --> Service
 PyPDF --> Extractor
 Docx --> Extractor
 Werkzeug --> Blueprint
+Alpine --> Blueprint
+Tailwind --> Blueprint
+Inter --> Blueprint
+Highlight --> Blueprint
 Blueprint --> Service
 Service --> Extractor
 Service --> Models
@@ -335,6 +394,7 @@ Models --> Utils
 - [app/blueprints/ai.py:1-20](file://app/blueprints/ai.py#L1-L20)
 - [app/services/ai_service.py:47-115](file://app/services/ai_service.py#L47-L115)
 - [app/utils/extract_upload.py:44-58](file://app/utils/extract_upload.py#L44-L58)
+- [app/templates/base.html:8-13](file://app/templates/base.html#L8-L13)
 
 ### 数据库迁移脚本
 
@@ -360,6 +420,12 @@ AI知识库外部文件上传功能在性能方面采用了多项优化策略：
 - 避免阻塞主线程，提升用户体验
 - 支持并发处理多个文件上传请求
 
+### Alpine.js优化
+- **响应式数据绑定** - 实时更新界面状态
+- **虚拟DOM操作** - 减少不必要的DOM重绘
+- **事件委托** - 优化事件处理性能
+- **微任务队列** - 合理安排UI更新时机
+
 ### 内存管理优化
 - 流式处理大文件，避免内存溢出
 - 及时释放临时文件资源
@@ -377,6 +443,7 @@ AI知识库外部文件上传功能在性能方面采用了多项优化策略：
 | 问题类型 | 症状 | 可能原因 | 解决方案 |
 |----------|------|----------|----------|
 | 文件上传失败 | 上传按钮禁用或报错 | 不支持的文件格式 | 检查文件扩展名是否在支持列表中 |
+| Alpine.js功能异常 | 拖拽无效或文件管理失效 | Alpine.js未正确加载 | 确认Alpine.js版本兼容性 |
 | OCR处理失败 | 图片文件无法识别 | LLM配置问题 | 确认OpenAI API密钥和模型配置 |
 | Wiki生成错误 | 文章内容为空 | 文件内容格式问题 | 检查源文件是否包含可读文本 |
 | 存储空间不足 | 文件保存失败 | 磁盘空间限制 | 清理临时文件或增加存储空间 |
@@ -384,31 +451,41 @@ AI知识库外部文件上传功能在性能方面采用了多项优化策略：
 ### 调试步骤
 
 1. **检查文件格式** - 确认文件扩展名在支持列表中
-2. **验证API配置** - 检查OpenAI API密钥和模型设置
-3. **查看日志信息** - 分析应用日志中的错误详情
-4. **测试连接** - 验证与外部服务的网络连接
+2. **验证Alpine.js加载** - 检查浏览器控制台是否有Alpine.js错误
+3. **验证API配置** - 检查OpenAI API密钥和模型设置
+4. **查看日志信息** - 分析应用日志中的错误详情
+5. **测试连接** - 验证与外部服务的网络连接
 
 **章节来源**
 - [app/services/ai_service.py:467-522](file://app/services/ai_service.py#L467-L522)
 - [app/utils/extract_upload.py:118-125](file://app/utils/extract_upload.py#L118-L125)
+- [app/templates/base.html:12](file://app/templates/base.html#L12)
 
 ## 结论
 
 AI知识库外部文件上传功能是一个功能完整、架构清晰的现代化文档处理系统。它成功地将多种文件格式的处理、AI驱动的内容理解和用户友好的界面集成在一起，为用户提供了一站式的知识库构建解决方案。
+
+**最新改进** 新增的拖拽上传界面和Alpine.js交互功能显著提升了用户体验：
+- **现代化界面** - 直观的拖拽上传区域和实时文件管理
+- **流畅交互** - Alpine.js提供的响应式数据绑定和事件处理
+- **多文件支持** - 支持批量文件上传和管理
+- **增强的视觉反馈** - 拖拽状态指示和文件大小格式化显示
 
 ### 主要优势
 
 1. **多格式支持** - 全面支持PDF、Word、文本和图片文件
 2. **智能化处理** - 通过OCR技术处理图片内容
 3. **自动化流程** - 从上传到Wiki生成的完整自动化
-4. **用户友好** - 直观的拖拽上传界面
-5. **可扩展性** - 基于插件化的架构设计
+4. **现代化界面** - 直观的拖拽上传界面和Alpine.js交互
+5. **用户友好** - 实时文件管理和状态反馈
+6. **可扩展性** - 基于插件化的架构设计
 
 ### 技术亮点
 
 - **异步处理架构** - 提升系统响应性和吞吐量
+- **Alpine.js响应式** - 实现轻量级的前端交互框架
 - **错误恢复机制** - 确保系统稳定运行
 - **灵活的配置选项** - 支持多种部署环境
 - **完善的监控机制** - 便于问题诊断和性能优化
 
-该功能为AI知识库的实用化和普及化奠定了坚实的技术基础，是现代知识管理系统的重要组成部分。
+该功能为AI知识库的实用化和普及化奠定了坚实的技术基础，是现代知识管理系统的重要组成部分。新增的拖拽上传界面和Alpine.js交互功能使其在用户体验和技术架构上都达到了新的高度。

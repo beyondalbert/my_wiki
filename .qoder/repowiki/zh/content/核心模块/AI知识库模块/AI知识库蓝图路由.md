@@ -13,24 +13,27 @@
 - [app/services/doc_service.py](file://app/services/doc_service.py)
 - [app/utils/markdown.py](file://app/utils/markdown.py)
 - [app/utils/outline.py](file://app/utils/outline.py)
+- [app/utils/extract_upload.py](file://app/utils/extract_upload.py)
 - [app/config.py](file://app/config.py)
 - [app/extensions.py](file://app/extensions.py)
 - [app/__init__.py](file://app/__init__.py)
 - [app/templates/ai/index.html](file://app/templates/ai/index.html)
 - [app/templates/ai/detail.html](file://app/templates/ai/detail.html)
 - [app/templates/ai/new.html](file://app/templates/ai/new.html)
+- [app/templates/ai/edit.html](file://app/templates/ai/edit.html)
 - [app/templates/ai/sources.html](file://app/templates/ai/sources.html)
-- [app/templates/ai/sourcess.html](file://app/templates/ai/sourcess.html)
+- [app/templates/ai/wiki_home.html](file://app/templates/ai/wiki_home.html)
+- [app/templates/ai/wiki_article.html](file://app/templates/ai/wiki_article.html)
 - [app/templates/doc/view.html](file://app/templates/doc/view.html)
 </cite>
 
 ## 更新摘要
 **所做更改**
-- 新增文档到AI知识库集成功能的详细说明
-- 新增失败文档重试机制路由的完整文档
-- 更新AI知识库蓝图路由文档以反映新增的 /ai/new 路由方法扩展
-- 新增GET和POST方法支持的详细说明，提升用户体验
-- 补充AI知识库创建表单的完整交互流程
+- 新增外部文件上传功能的完整文档，包括PDF、Word、文本、图片等多格式支持
+- 新增AI知识库编辑页面的详细说明，包括模型配置和RAG开关
+- 更新AI知识库蓝图路由文档以反映新增的外部文件上传路由和编辑页面
+- 新增文件上传处理流程、格式验证和进度跟踪机制
+- 补充AI知识库编辑表单的完整交互流程
 - 更新RESTful API定义和调用示例
 
 ## 目录
@@ -110,6 +113,8 @@ DOCS --> DOCM
 - AI蓝图
   - 提供AI知识库CRUD、源文档选择、构建触发、状态查询、Wiki浏览、图谱、聊天
   - 内部通过服务层执行异步构建与链接解析
+  - 新增外部文件上传功能，支持PDF、Word、文本、图片等多格式
+  - 新增AI知识库编辑页面，支持模型配置和RAG开关
 - 知识库蓝图
   - 提供知识库列表、新建、详情、编辑、删除、成员管理等页面路由
   - 于服务层进行访问控制与成员增删
@@ -126,30 +131,34 @@ DOCS --> DOCM
   - 开放AI相关配置项、CSRF与登录管理、蓝图注册
 
 **章节来源**
-- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
+- [app/blueprints/ai.py:27-395](file://app/blueprints/ai.py#L27-L395)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
 - [app/blueprints/doc.py:20-231](file://app/blueprints/doc.py#L20-L231)
 - [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
-- [app/models/ai_kb.py:8-122](file://app/models/ai_kb.py#L8-L122)
+- [app/models/ai_kb.py:8-146](file://app/models/ai_kb.py#L8-L146)
 - [app/models/knowledge_base.py:8-62](file://app/models/knowledge_base.py#L8-L62)
 - [app/models/document.py:20-98](file://app/models/document.py#L20-L98)
 - [app/config.py:15-83](file://app/config.py#L15-L83)
 - [app/extensions.py:8-17](file://app/extensions.py#L8-L17)
 
 ## 架构总览
-AI知识库蓝图路由围绕"蓝图-服务-模型-配置"的分层设计展开，采用Flask蓝图注册到应用工厂，统一由扩展模块初始化数据库、登录与CSRF保护。AI构建采用后台线程异步执行，状态通过状态查询接口反馈；聊天交互支持纯关键词检索与可选RAG增强两种模式。
+AI知识库蓝图路由围绕"蓝图-服务-模型-配置"的分层设计展开，采用Flask蓝图注册到应用工厂，统一由扩展模块初始化数据库、登录与CSRF保护。AI构建采用后台线程异步执行，状态通过状态查询接口反馈；聊天交互支持纯关键词检索与可选RAG增强两种模式。新增的外部文件上传功能通过专用路由处理多格式文件，支持批量上传和进度跟踪。
 
 ```mermaid
 sequenceDiagram
 participant C as "客户端"
 participant A as "AI蓝图"
+participant U as "文件上传处理"
 participant S as "AI服务"
 participant DB as "数据库"
 participant FS as "AI Wiki 文件系统"
-C->>A : "POST /ai/<ai_kb_id>/build"
-A->>S : "build_wiki_async(app, ai_kb_id, only_pending)"
+C->>A : "POST /ai/<ai_kb_id>/upload"
+A->>U : "处理多格式文件上传"
+U->>U : "验证文件格式与大小"
+U->>DB : "记录上传源文档信息"
+U->>S : "触发异步构建任务"
 S->>DB : "更新 AI知识库状态为 BUILDING"
 loop 遍历待处理源文档
 S->>DB : "更新源状态为 PROCESSING"
@@ -164,11 +173,13 @@ A-->>C : "重定向并提示任务已启动"
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
+- [app/utils/extract_upload.py:99-126](file://app/utils/extract_upload.py#L99-L126)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 **章节来源**
-- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
+- [app/utils/extract_upload.py:99-126](file://app/utils/extract_upload.py#L99-L126)
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
 
 ## 详细组件分析
@@ -178,10 +189,11 @@ A-->>C : "重定向并提示任务已启动"
   - GET /ai/：列出当前用户的所有AI知识库
   - GET/POST /ai/new：创建AI知识库（名称、描述、模型、RAG开关）
   - GET /ai/<int:ai_kb_id>：AI知识库详情（源、文章、红链统计）
-  - POST /ai/<int:ai_kb_id>/edit：编辑AI知识库（名称、描述、模型、RAG）
+  - GET/POST /ai/<int:ai_kb_id>/edit：编辑AI知识库（名称、描述、模型、RAG开关）
   - POST /ai/<int:ai_kb_id>/delete：删除AI知识库
   - GET /ai/<int:ai_kb_id>/sources：选择源文档（仅显示当前用户可访问的文档）
   - POST /ai/<int:ai_kb_id>/sources/add：批量添加源文档
+  - POST /ai/<int:ai_kb_id>/sources/upload：上传外部文件作为源文档（PDF/Word/文本/图片）
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源文档
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/retry：重试失败的源文档
   - POST /ai/<int:ai_kb_id>/build：触发构建（可选仅处理待处理/失败）
@@ -198,7 +210,7 @@ A-->>C : "重定向并提示任务已启动"
 - 数据模型
   - AI知识库、源文档、文章、链接、分块（可选RAG）
 
-**更新** 新增GET方法支持AI知识库创建表单直接访问，提升用户体验；新增失败文档重试机制路由
+**更新** 新增外部文件上传路由和AI知识库编辑页面路由，支持多格式文件上传和模型配置编辑
 
 ```mermaid
 flowchart TD
@@ -211,16 +223,79 @@ Valid --> |是| Error["显示错误并保留表单数据"]
 Valid --> |否| Create["创建AI知识库"]
 Create --> Success["重定向到详情页"]
 Error --> Redirect["重定向回创建页"]
+Start2(["进入 /ai/<ai_kb_id>/edit"]) --> Method2{"请求方法"}
+Method2 --> |GET| EditForm["渲染编辑表单"]
+Method2 --> |POST| Validate2["验证编辑数据"]
+EditForm --> RenderEdit["显示编辑表单含模型配置"]
+Validate2 --> Valid2{"名称是否为空"}
+Valid2 --> |是| Error2["显示错误并保留表单数据"]
+Valid2 --> |否| Save["保存AI知识库配置"]
+Save --> Success2["重定向到详情页"]
+Error2 --> Redirect2["重定向回编辑页"]
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:34-54](file://app/blueprints/ai.py#L34-L54)
+- [app/blueprints/ai.py:39-59](file://app/blueprints/ai.py#L39-L59)
+- [app/blueprints/ai.py:72-88](file://app/blueprints/ai.py#L72-L88)
 - [app/templates/ai/new.html:6-31](file://app/templates/ai/new.html#L6-L31)
+- [app/templates/ai/edit.html:9-38](file://app/templates/ai/edit.html#L9-L38)
 
 **章节来源**
-- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
+- [app/blueprints/ai.py:27-395](file://app/blueprints/ai.py#L27-L395)
 - [app/services/ai_service.py:47-408](file://app/services/ai_service.py#L47-L408)
-- [app/models/ai_kb.py:8-122](file://app/models/ai_kb.py#L8-L122)
+- [app/models/ai_kb.py:8-146](file://app/models/ai_kb.py#L8-L146)
+
+### 外部文件上传功能
+- 路由与职责
+  - POST /ai/<int:ai_kb_id>/sources/upload：上传PDF、Word、文本、图片等外部文件
+  - 支持多文件批量上传
+  - 自动检测文件格式并进行文本抽取
+  - 自动触发Wiki构建任务
+- 文件格式支持
+  - 文本文件：.txt、.md、.markdown
+  - PDF文件：.pdf
+  - Word文档：.docx
+  - 图片文件：.png、.jpg、.jpeg、.webp、.gif、.bmp
+- 处理流程
+  - 文件验证与格式检查
+  - 安全文件名生成与存储
+  - 文本抽取与预处理
+  - AI知识库源文档记录
+  - 自动触发构建任务
+- 错误处理
+  - 不支持的文件格式
+  - 文件大小限制
+  - 抽取失败处理
+  - 存储异常处理
+
+**更新** 新增完整的外部文件上传功能文档，包括格式支持、处理流程和错误处理
+
+**章节来源**
+- [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
+- [app/utils/extract_upload.py:25-126](file://app/utils/extract_upload.py#L25-L126)
+- [app/templates/ai/sources.html:19-109](file://app/templates/ai/sources.html#L19-L109)
+
+### AI知识库编辑页面
+- 路由与职责
+  - GET/POST /ai/<int:ai_kb_id>/edit：编辑AI知识库配置
+  - 支持名称、描述、Chat模型、RAG开关的修改
+  - 实时验证与错误提示
+- 表单字段
+  - 名称：必填，最大80字符
+  - 描述：可选，最大500字符
+  - Chat模型：可选，留空使用全局默认
+  - RAG开关：可选，需要服务端开启ENABLE_RAG
+- 用户体验
+  - 即时保存功能
+  - 危险操作确认
+  - 模型配置说明
+  - RAG功能说明
+
+**更新** 新增AI知识库编辑页面的详细文档，包括表单字段和用户体验设计
+
+**章节来源**
+- [app/blueprints/ai.py:72-88](file://app/blueprints/ai.py#L72-L88)
+- [app/templates/ai/edit.html:9-38](file://app/templates/ai/edit.html#L9-L38)
 
 ### 知识库蓝图（/kb）
 - 路由与职责
@@ -304,23 +379,25 @@ E --> |是| OK["允许访问"]
   - 若需实时状态推送，可在AI构建状态查询接口基础上引入WebSocket（如Flask-SocketIO），在构建状态变更时推送至订阅客户端
 
 **章节来源**
-- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
 
 ### 文件上传、批量处理与进度跟踪
 - 文件上传
+  - 外部文件上传：POST /ai/<int:ai_kb_id>/sources/upload 支持多文件上传
   - 文档内容通过JSON保存接口提交；未见独立文件上传路由
 - 批量处理
   - 源文档批量添加：POST /ai/<int:ai_kb_id>/sources/add 接收多个doc_ids
   - 文档快速加入AI知识库：POST /doc/<int:doc_id>/add-to-ai-kb 接收ai_kb_id
+  - 外部文件批量上传：支持multiple文件选择
 - 进度跟踪
   - 通过状态查询接口轮询构建状态与计数
   - 源文档状态枚举：PENDING、PROCESSING、PROCESSED、FAILED
 
-**更新** 新增文档快速加入AI知识库的批量处理功能
+**更新** 新增外部文件上传的批量处理功能和进度跟踪机制
 
 **章节来源**
-- [app/blueprints/ai.py:110-128](file://app/blueprints/ai.py#L110-L128)
-- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/ai.py:153-205](file://app/blueprints/ai.py#L153-L205)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
 - [app/blueprints/doc.py:205-230](file://app/blueprints/doc.py#L205-L230)
 - [app/models/ai_kb.py:16-21](file://app/models/ai_kb.py#L16-L21)
 
@@ -329,10 +406,11 @@ E --> |是| OK["允许访问"]
   - GET /ai/：返回当前用户的所有AI知识库
   - GET/POST /ai/new：GET返回创建表单，POST创建AI知识库（表单字段 name, description, chat_model, enable_rag）
   - GET /ai/<int:ai_kb_id>：返回AI知识库详情
-  - POST /ai/<int:ai_kb_id>/edit：表单字段 name, description, chat_model, enable_rag
+  - GET/POST /ai/<int:ai_kb_id>/edit：GET返回编辑表单，POST保存配置（表单字段 name, description, chat_model, enable_rag）
   - POST /ai/<int:ai_kb_id>/delete：删除AI知识库
   - GET /ai/<int:ai_kb_id>/sources：返回可选源文档列表
   - POST /ai/<int:ai_kb_id>/sources/add：表单字段 doc_ids（多选）
+  - POST /ai/<int:ai_kb_id>/sources/upload：multipart/form-data，支持多文件上传
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/remove：移除源文档
   - POST /ai/<int:ai_kb_id>/sources/<int:source_id>/retry：重试失败的源文档
   - POST /ai/<int:ai_kb_id>/build：表单字段 scope（默认仅待处理）
@@ -360,10 +438,10 @@ E --> |是| OK["允许访问"]
   - POST /doc/share/<int:share_id>/revoke：撤销分享
   - POST /doc/<int:doc_id>/add-to-ai-kb：表单字段 ai_kb_id
 
-**更新** 新增GET/POST方法支持，特别是 /ai/new 路由现在同时支持GET和POST方法；新增文档到AI知识库的快捷加入API
+**更新** 新增外部文件上传API和AI知识库编辑API的详细定义
 
 **章节来源**
-- [app/blueprints/ai.py:27-309](file://app/blueprints/ai.py#L27-L309)
+- [app/blueprints/ai.py:27-395](file://app/blueprints/ai.py#L27-L395)
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/blueprints/doc.py:20-231](file://app/blueprints/doc.py#L20-L231)
 
@@ -380,12 +458,13 @@ E --> |是| OK["允许访问"]
   - 构建任务已在运行：页面提示"正在生成，请稍候"
   - 创建AI知识库名称为空：页面提示"请输入名称"
   - 重试失败文档：页面提示"已重置该文档为待处理..."
+  - 外部文件上传：支持的格式提示和错误处理
 
-**更新** 新增创建AI知识库名称验证错误处理；新增重试失败文档的错误处理
+**更新** 新增外部文件上传的错误处理和格式验证提示
 
 **章节来源**
-- [app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
-- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/blueprints/ai.py:379-395](file://app/blueprints/ai.py#L379-L395)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
 - [app/blueprints/doc.py:205-230](file://app/blueprints/doc.py#L205-L230)
 
 ### 参数验证规则与安全考虑
@@ -393,12 +472,16 @@ E --> |是| OK["允许访问"]
   - 可见性/角色/类型/隐私：限定枚举值，否则回退默认
   - 数字字段：转换失败则忽略
   - 必填字段：如名称为空时返回错误并保留表单数据
+  - 文件上传：验证文件格式、大小限制
 - 安全措施
   - CSRF保护：启用CSRFProtect
   - 登录保护：login_required装饰器
   - 分享令牌：使用安全随机token
   - 会话安全：Cookie HttpOnly、SameSite策略
   - LLM客户端：从配置读取base_url与api_key，避免硬编码
+  - 文件上传：安全文件名生成、格式验证、大小限制
+
+**更新** 新增文件上传的安全验证规则
 
 **章节来源**
 - [app/blueprints/kb.py:35-43](file://app/blueprints/kb.py#L35-L43)
@@ -416,14 +499,18 @@ E --> |是| OK["允许访问"]
   - 当前未实现WebSocket；可通过引入SocketIO在构建状态变化时推送消息
 - 文档到AI知识库集成
   - 在文档视图中提供AI知识库快捷加入按钮，支持一键添加到多个知识库
+- 外部文件上传界面
+  - 支持拖拽上传、文件预览、批量选择
+  - 实时格式验证和错误提示
 
-**更新** 新增文档到AI知识库的前端集成说明
+**更新** 新增外部文件上传界面的前端集成说明
 
 **章节来源**
 - [app/blueprints/ai.py:29](file://app/blueprints/ai.py#L29)
-- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
-- [app/templates/ai/index.html:1-38](file://app/templates/ai/index.html#L1-L38)
-- [app/templates/ai/detail.html:1-81](file://app/templates/ai/detail.html#L1-L81)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
+- [app/templates/ai/index.html:1-59](file://app/templates/ai/index.html#L1-L59)
+- [app/templates/ai/detail.html:1-140](file://app/templates/ai/detail.html#L1-L140)
+- [app/templates/ai/sources.html:19-109](file://app/templates/ai/sources.html#L19-L109)
 - [app/templates/doc/view.html:152-184](file://app/templates/doc/view.html#L152-L184)
 
 ## 依赖分析
@@ -471,6 +558,11 @@ CFG --> APP["应用工厂"]
   - LLM输入对长文本进行安全上限截断，防止成本过高
 - 存储与索引
   - AI Wiki文件写入磁盘，文章与链接建立索引，提升解析效率
+- 文件处理优化
+  - 外部文件上传采用异步处理，避免长时间阻塞
+  - 支持批量文件处理，提高处理效率
+
+**更新** 新增文件处理的性能优化考量
 
 **章节来源**
 - [app/services/ai_service.py:313-344](file://app/services/ai_service.py#L313-L344)
@@ -485,24 +577,27 @@ CFG --> APP["应用工厂"]
   - 聊天无结果：确认知识库已生成文章，或开启RAG后提供有效模型配置
   - 创建失败：检查名称是否为空，查看错误提示
   - 重试失败文档：确认文档状态已重置为待处理
+  - 文件上传失败：检查文件格式是否受支持，文件大小是否超过限制
+  - 文本抽取失败：确认文件不是扫描件或加密文件
 - 调试步骤
   - 查看状态接口返回的错误信息与最后构建时间
   - 检查源文档状态是否全部为PROCESSED
   - 核对LLM配置（base_url、api_key、model）是否正确
+  - 检查文件上传目录权限和磁盘空间
 - 性能监控
   - 监控构建耗时与并发任务数
   - 关注数据库慢查询与锁等待
   - 对接日志系统记录关键事件（构建开始/结束、失败原因）
 
-**更新** 新增创建AI知识库失败的调试指导；新增重试失败文档的故障排查
+**更新** 新增文件上传和文本抽取的故障排查指导
 
 **章节来源**
-- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
 - [app/services/ai_service.py:338-341](file://app/services/ai_service.py#L338-L341)
 - [app/config.py:37-47](file://app/config.py#L37-L47)
 
 ## 结论
-AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。最新的 /ai/new 路由方法扩展显著提升了用户体验，允许直接访问AI知识库创建表单。新增的文档到AI知识库集成功能进一步简化了工作流程，用户可以直接从文档视图界面快速添加到多个知识库。失败文档重试机制提供了更好的容错能力。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
+AI知识库蓝图路由以清晰的分层设计实现了从AI知识库管理到Wiki构建与聊天的完整闭环。通过严格的权限控制与服务层抽象，系统具备良好的可维护性与扩展性。最新的 /ai/new 路由方法扩展显著提升了用户体验，允许直接访问AI知识库创建表单。新增的文档到AI知识库集成功能进一步简化了工作流程，用户可以直接从文档视图界面快速添加到多个知识库。失败文档重试机制提供了更好的容错能力。新增的外部文件上传功能支持多种格式的批量处理，大大扩展了AI知识库的内容来源。AI知识库编辑页面提供了更精细的配置选项，包括模型选择和RAG开关。建议后续引入WebSocket实现实时状态推送，并完善文件上传与批处理的统一接口，以进一步提升用户体验与开发效率。
 
 ## 附录
 - 配置项要点

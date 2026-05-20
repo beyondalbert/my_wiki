@@ -1,6 +1,30 @@
 {% extends "base.html" %}
 {% block title %}选择源文档 · {{ ai_kb.name }}{% endblock %}
 {% block content %}
+<style>
+  .btn-violet { background-color:#7c3aed; color:#fff; }
+  .btn-violet:hover { background-color:#6d28d9; }
+  .btn-violet:active { background-color:#5b21b6; }
+  .btn-violet:disabled { background-color:#cbd5e1; cursor:not-allowed; }
+
+  /* 自定义文件选择区 */
+  .file-dropzone {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; padding:24px 16px;
+    border:2px dashed #c4b5fd; border-radius:12px;
+    background-color:#faf5ff; color:#6d28d9;
+    cursor:pointer; transition:all .15s ease;
+    text-align:center;
+  }
+  .file-dropzone:hover { background-color:#f3e8ff; border-color:#a78bfa; }
+  .file-dropzone.dragging { background-color:#ede9fe; border-color:#7c3aed; transform:scale(1.005); }
+  .file-dropzone__btn {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 14px; border-radius:8px;
+    background-color:#7c3aed; color:#fff; font-size:13px; font-weight:500;
+  }
+  .file-dropzone:hover .file-dropzone__btn { background-color:#6d28d9; }
+</style>
 <div class="max-w-5xl mx-auto px-4 py-8">
   <div class="flex items-center justify-between mb-6">
     <div>
@@ -11,24 +35,121 @@
   </div>
 
   <!-- 上传外部文件作为源文档 -->
-  <div class="bg-white border border-dashed border-violet-300 rounded-xl p-5 mb-6">
+  <div class="bg-white border border-dashed border-violet-300 rounded-xl p-5 mb-6"
+       x-data="{
+         items: [],
+         dragging: false,
+         get count() { return this.items.length; },
+         setFiles(fileList) {
+           const arr = Array.from(fileList);
+           const exist = new Set(this.items.map(it => it.file.name + '_' + it.file.size));
+           arr.forEach(f => {
+             const key = f.name + '_' + f.size;
+             if (!exist.has(key)) {
+               this.items.push({ id: Date.now() + '_' + Math.random().toString(36).slice(2,7) + '_' + f.name, file: f });
+               exist.add(key);
+             }
+           });
+           this.sync();
+         },
+         removeAt(idx) {
+           this.items.splice(idx, 1);
+           this.sync();
+         },
+         clearAll() {
+           this.items = [];
+           this.sync();
+         },
+         sync() {
+           const dt = new DataTransfer();
+           this.items.forEach(it => dt.items.add(it.file));
+           this.$refs.fileInput.files = dt.files;
+         },
+         fmtSize(b) {
+           if (b < 1024) return b + ' B';
+           if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+           return (b/1048576).toFixed(1) + ' MB';
+         }
+       }">
     <div class="flex items-center gap-2 mb-3">
-      <span class="text-2xl">📎</span>
+      <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-violet-100 text-violet-600">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.9 5 5 0 019.9-1A5.5 5.5 0 0118 17h-1m-6 0V9m0 0l-3 3m3-3l3 3" />
+        </svg>
+      </span>
       <h2 class="text-base font-semibold text-slate-800">上传外部文件</h2>
       <span class="text-xs text-slate-400">支持 PDF / Word(.docx) / 文本(.txt/.md) / 图片(多模态 OCR)</span>
     </div>
     <form method="post" enctype="multipart/form-data"
           action="{{ url_for('ai.upload_source', ai_kb_id=ai_kb.id) }}"
-          class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          class="space-y-3">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}" />
-      <input type="file" name="files" multiple
-             accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp"
-             class="flex-1 text-sm text-slate-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" required />
-      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 whitespace-nowrap">
-        上传并启动 Wiki 处理
-      </button>
+
+      <label class="file-dropzone"
+             :class="{ 'dragging': dragging }"
+             @dragover.prevent="dragging = true"
+             @dragleave.prevent="dragging = false"
+             @drop.prevent="dragging = false; setFiles($event.dataTransfer.files)">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M7 16a4 4 0 01-.88-7.9 5 5 0 019.9-1A5.5 5.5 0 0118 17h-1m-6 0V9m0 0l-3 3m3-3l3 3" />
+        </svg>
+        <div class="text-sm font-medium">
+          <span x-show="count === 0">点击选择文件，或拖拽到此处</span>
+          <span x-show="count > 0" x-cloak>已选 <span x-text="count"></span> 个文件，可继续追加</span>
+        </div>
+        <span class="file-dropzone__btn">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4" />
+          </svg>
+          选择文件
+        </span>
+        <span class="text-xs text-slate-400">支持 PDF / .docx / .txt / .md / 图片（多选）</span>
+        <input type="file" name="files" multiple
+               x-ref="fileInput"
+               @change="setFiles($event.target.files)"
+               accept=".pdf,.docx,.txt,.md,.markdown,.png,.jpg,.jpeg,.webp,.gif,.bmp"
+               class="hidden" />
+      </label>
+
+      <!-- 已选文件清单（可逐条删除） -->
+      <div x-show="count > 0" x-cloak class="bg-slate-50 border border-slate-200 rounded-md">
+        <div class="flex items-center justify-between px-3 py-2 border-b border-slate-200 text-xs text-slate-500">
+          <span>待上传 <span class="font-semibold text-slate-700" x-text="count"></span> 个文件</span>
+          <button type="button" @click="clearAll()" class="text-slate-500 hover:text-rose-600">全部清空</button>
+        </div>
+        <ul class="divide-y divide-slate-200">
+          <template x-for="(it, idx) in items" :key="it.id">
+            <li class="flex items-center gap-2 px-3 py-2 text-sm">
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h7l5 5v11a2 2 0 01-2 2z" />
+              </svg>
+              <span class="flex-1 truncate text-slate-700" x-text="it.file.name" :title="it.file.name"></span>
+              <span class="text-xs text-slate-400 shrink-0" x-text="fmtSize(it.file.size)"></span>
+              <button type="button" @click="removeAt(idx)"
+                      class="shrink-0 inline-flex items-center justify-center w-6 h-6 rounded text-slate-400 hover:text-rose-600 hover:bg-rose-50"
+                      :title="'移除 ' + it.file.name">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M6 18L18 6" />
+                </svg>
+              </button>
+            </li>
+          </template>
+        </ul>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 pt-1">
+        <p class="text-xs text-slate-400">上传后会自动抽取文本（图片走多模态大模型）并生成 Wiki 条目。</p>
+        <button type="submit"
+                :disabled="count === 0"
+                class="btn-violet inline-flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v12m0-12l-4 4m4-4l4 4M5 20h14" />
+          </svg>
+          <span>上传并处理</span>
+          <span x-show="count > 0" x-cloak x-text="'(' + count + ')'" class="opacity-80"></span>
+        </button>
+      </div>
     </form>
-    <p class="text-xs text-slate-400 mt-2">上传后会自动抽取文本（图片走多模态大模型）并生成 Wiki 条目。</p>
   </div>
 
   <div class="text-sm font-semibold text-slate-700 mb-2">或，从已有知识库中选择文档</div>
@@ -63,7 +184,7 @@
     </div>
     <div class="mt-4 flex items-center justify-between">
       <p class="text-xs text-slate-400">勾选后点击右侧「加入选中文档」；已加入的文档不可重复勾选。</p>
-      <button class="px-4 py-2 bg-violet-600 text-white rounded-lg hover:bg-violet-500 disabled:bg-slate-300 disabled:cursor-not-allowed"
+      <button class="btn-violet px-4 py-2 rounded-lg"
               {% if not has_addable %}disabled{% endif %}>加入选中文档</button>
     </div>
   </form>

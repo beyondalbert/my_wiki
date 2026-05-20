@@ -3,6 +3,7 @@
 <cite>
 **本文引用的文件**
 - [app/services/ai_service.py](file://app/services/ai_service.py)
+- [app/utils/extract_upload.py](file://app/utils/extract_upload.py)
 - [app/models/ai_kb.py](file://app/models/ai_kb.py)
 - [app/utils/markdown.py](file://app/utils/markdown.py)
 - [app/utils/outline.py](file://app/utils/outline.py)
@@ -13,6 +14,7 @@
 - [app/utils/ids.py](file://app/utils/ids.py)
 - [app/services/config_service.py](file://app/services/config_service.py)
 - [requirements.txt](file://requirements.txt)
+- [scripts/migrate_aikb_source_uploads.sql](file://scripts/migrate_aikb_source_uploads.sql)
 </cite>
 
 ## 目录
@@ -30,13 +32,13 @@
 ## 简介
 本文件面向AI知识库服务层，系统化梳理从源文档到Wiki条目的完整处理链路，覆盖状态机管理、源文档处理管道、错误恢复机制、链接解析与跨文档引用、向量嵌入与RAG检索（可选）、增量更新策略、缓存与性能优化、OpenAI兼容SDK封装、并发与后台任务调度，以及蓝图层交互与中间件集成。文档以"可读性优先"的原则，结合图示与路径引用，帮助开发者快速理解与扩展。
 
-**更新** 服务层现已采用字符串ID处理模式，所有AI知识库相关函数均接受字符串类型的ID参数，确保与模型层的统一性和类型安全性。同时，增强了错误处理机制，包括配置获取的回退机制、更好的空文档处理、改进的日志记录和配置管理，显著提升了AI知识库构建过程的可靠性。
+**更新** 服务层现已采用字符串ID处理模式，所有AI知识库相关函数均接受字符串类型的ID参数，确保与模型层的统一性和类型安全性。同时，增强了错误处理机制，包括配置获取的回退机制、更好的空文档处理、改进的日志记录和配置管理，显著提升了AI知识库构建过程的可靠性。**新增功能**：文件上传处理、多模态图像OCR、概念合并算法等核心服务功能，为AI知识库提供了更强大的文档处理能力。
 
 ## 项目结构
 - 服务层位于 app/services，核心为 ai_service.py，负责LLM封装、Wiki构建、链接解析、异步构建与RAG问答。
-- 数据模型位于 app/models，核心为 ai_kb.py，定义AI知识库、源文档、文章、链接、分片等实体及状态枚举。
-- 工具函数位于 app/utils，包括Markdown渲染与wikilink收集、Editor.js内容提取。
-- 蓝图层位于 app/blueprints，ai.py 提供知识库管理、构建、浏览、图谱、聊天等路由。
+- 数据模型位于 app/models，核心为 ai_kb.py，定义AI知识库、源文档、文章、链接、分片等实体及状态枚举，**新增** AIKBSourceKind枚举支持文档和上传两种源类型。
+- 工具函数位于 app/utils，包括Markdown渲染与wikilink收集、Editor.js内容提取、**新增**文件上传处理与OCR功能。
+- 蓝图层位于 app/blueprints，ai.py 提供知识库管理、构建、浏览、图谱、聊天等路由，**新增**文件上传端点。
 - 配置与扩展位于 app/config.py 与 app/extensions.py，统一注入数据库、登录、CSRF、AI相关参数。
 - 应用工厂位于 app/__init__.py，注册蓝图、扩展与上下文处理器。
 - ID生成工具位于 app/utils/ids.py，提供短URL友好的随机ID生成器。
@@ -50,17 +52,18 @@ CFG["配置: config.py"]
 EXT["扩展: extensions.py"]
 ID_GEN["ID生成: utils/ids.py"]
 CONF_SVC["配置服务: services/config_service.py"]
-end
+END_UPLOAD["上传处理: utils/extract_upload.py"]
+END
 subgraph "服务层"
 SVC_AI["服务: ai_service.py"]
-end
+END
 subgraph "模型层"
 M_AIKB["模型: ai_kb.py"]
-end
+END
 subgraph "工具层"
 U_MD["工具: utils/markdown.py"]
 U_OUT["工具: utils/outline.py"]
-end
+END
 BP_AI --> SVC_AI
 SVC_AI --> M_AIKB
 SVC_AI --> U_MD
@@ -69,34 +72,40 @@ BP_AI --> CFG
 BP_AI --> EXT
 ID_GEN --> M_AIKB
 CONF_SVC --> SVC_AI
+END_UPLOAD --> SVC_AI
 ```
 
 **图表来源**
-- [app/blueprints/ai.py:1-309](file://app/blueprints/ai.py#L1-L309)
-- [app/services/ai_service.py:1-444](file://app/services/ai_service.py#L1-L444)
-- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
+- [app/blueprints/ai.py:1-395](file://app/blueprints/ai.py#L1-L395)
+- [app/services/ai_service.py:1-585](file://app/services/ai_service.py#L1-L585)
+- [app/models/ai_kb.py:1-146](file://app/models/ai_kb.py#L1-L146)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-143](file://app/utils/outline.py#L1-L143)
 - [app/config.py:1-84](file://app/config.py#L1-L84)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/services/config_service.py:1-82](file://app/services/config_service.py#L1-L82)
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
 
 **章节来源**
 - [app/__init__.py:11-101](file://app/__init__.py#L11-L101)
-- [app/blueprints/ai.py:1-309](file://app/blueprints/ai.py#L1-L309)
-- [app/services/ai_service.py:1-444](file://app/services/ai_service.py#L1-L444)
-- [app/models/ai_kb.py:1-122](file://app/models/ai_kb.py#L1-L122)
+- [app/blueprints/ai.py:1-395](file://app/blueprints/ai.py#L1-L395)
+- [app/services/ai_service.py:1-585](file://app/services/ai_service.py#L1-L585)
+- [app/models/ai_kb.py:1-146](file://app/models/ai_kb.py#L1-L146)
 - [app/utils/markdown.py:1-87](file://app/utils/markdown.py#L1-L87)
 - [app/utils/outline.py:1-143](file://app/utils/outline.py#L1-L143)
 - [app/config.py:1-84](file://app/config.py#L1-L84)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 - [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/services/config_service.py:1-82](file://app/services/config_service.py#L1-L82)
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
 
 ## 核心组件
 - LLM客户端封装：统一OpenAI兼容SDK调用，支持多厂商与本地代理，动态加载client，避免重复初始化。**新增配置获取回退机制**：当DB配置服务在后台线程中不可用时，自动回退到应用配置。
 - Wiki构建器：将源文档转换为标准模板的Markdown条目，输出标题、别名、摘要、标签、正文与相关条目列表。**增强空文档处理**：对空文档进行特殊处理，避免构建失败。
+- **新增：文件上传处理**：支持PDF、Word、文本、图片等多种格式的上传，自动检测文件类型并进行相应处理。
+- **新增：多模态图像OCR**：通过多模态LLM对图片内容进行OCR识别，提取文字和图表要点。
+- **新增：概念合并算法**：实现跨文档的概念去重和合并，支持精确匹配、大小写忽略匹配、别名匹配等策略。
 - 链接解析器：扫描条目中的[[Title]]占位符，基于标题/别名/slug建立索引，生成双向链接表与红链统计。
 - 异步构建流水线：后台线程执行构建，维护源文档状态机与知识库整体状态机，失败回滚与错误消息持久化。**改进日志记录**：增加详细的构建过程日志，便于调试和监控。
 - 可选RAG问答：基于关键词重排Top-N条目，拼接上下文后调用LLM回答；向量存储与嵌入模型预留（需启用RAG）。
@@ -110,9 +119,11 @@ CONF_SVC --> SVC_AI
 - [app/services/ai_service.py:326-381](file://app/services/ai_service.py#L326-L381)
 - [app/services/ai_service.py:427-444](file://app/services/ai_service.py#L427-L444)
 - [app/blueprints/ai.py:173-203](file://app/blueprints/ai.py#L173-L203)
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
 
 ## 架构总览
-服务层围绕"知识库-源文档-文章-链接"四元组展开，通过LLM生成文章，再进行wikilink解析，最终形成可浏览的Wiki与可选的RAG问答能力。蓝图层负责权限校验、状态查询与UI交互，配置层提供模型与目录参数。所有ID现在统一使用字符串类型，确保跨层一致性和类型安全。**新增配置回退机制**确保在各种环境下都能正确获取配置信息。
+服务层围绕"知识库-源文档-文章-链接"四元组展开，通过LLM生成文章，再进行wikilink解析，最终形成可浏览的Wiki与可选的RAG问答能力。蓝图层负责权限校验、状态查询与UI交互，配置层提供模型与目录参数。所有ID现在统一使用字符串类型，确保跨层一致性和类型安全。**新增配置回退机制**确保在各种环境下都能正确获取配置信息。**新增文件上传处理**支持多种格式的文档上传和处理。
 
 ```mermaid
 sequenceDiagram
@@ -126,6 +137,12 @@ Client->>BP : "POST /ai/<ai_kb_id>/build"
 BP->>Svc : "build_wiki_async(app, ai_kb_id : str, only_pending)"
 Svc->>DB : "设置状态 BUILDING"
 loop 遍历待处理源文档
+alt 外部上传件
+Svc->>FS : "extract_text_from_upload(file_path, filename, llm)"
+FS-->>Svc : "纯文本内容"
+else 关联文档
+Svc->>LLM : "chat(系统提示+用户提示)"
+end
 Svc->>LLM : "chat(系统提示+用户提示)"
 LLM-->>Svc : "JSON结构化输出"
 Svc->>DB : "upsert_article(...)"
@@ -143,6 +160,7 @@ BP-->>Client : "任务已启动"
 - [app/services/ai_service.py:147-171](file://app/services/ai_service.py#L147-L171)
 - [app/services/ai_service.py:214-240](file://app/services/ai_service.py#L214-L240)
 - [app/services/ai_service.py:261-288](file://app/services/ai_service.py#L261-L288)
+- [app/utils/extract_upload.py:99-125](file://app/utils/extract_upload.py#L99-L125)
 
 ## 详细组件分析
 
@@ -151,6 +169,7 @@ BP-->>Client : "任务已启动"
   - 基于当前应用配置动态构造client，支持base_url与api_key，模型名可按知识库覆盖。
   - **新增配置获取回退机制**：优先使用显式参数，然后尝试DB配置服务，最后回退到应用配置，确保在后台线程中也能正常工作。
   - 提供chat方法，固定系统与用户消息结构，支持响应格式约束。
+  - **新增多模态图像处理**：支持vision模型的图片OCR功能，通过data URL格式传输图片。
   - 导入异常保护，缺失SDK时抛出明确运行时错误。
 - 并发与稳定性
   - client惰性初始化，避免重复导入与初始化开销。
@@ -165,14 +184,106 @@ class LLMClient {
 -_client
 +client
 +chat(system, user, temperature, response_format) str
++chat_with_image(prompt, image_data_url, temperature) str
 }
 ```
 
 **图表来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
+- [app/services/ai_service.py:97-115](file://app/services/ai_service.py#L97-L115)
 
 **章节来源**
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
+- [app/services/ai_service.py:97-115](file://app/services/ai_service.py#L97-L115)
+
+### 文件上传处理与OCR
+- 功能要点
+  - **支持格式**：PDF、Word(.docx)、文本(.txt/.md)、图片(.png/.jpg/.jpeg/.webp/.gif/.bmp)
+  - **自动类型检测**：根据文件扩展名判断文件类型，支持未知格式的降级处理
+  - **PDF处理**：使用pypdf库逐页提取文本，处理页面提取失败的情况
+  - **Word处理**：使用python-docx库提取段落和表格内容
+  - **文本处理**：直接读取UTF-8编码的文本文件
+  - **图片OCR**：通过多模态LLM进行OCR识别，支持流程图和架构图的结构描述
+  - **错误处理**：对空内容、不支持的格式、文件不存在等情况进行明确处理
+- 使用场景
+  - 外部上传件的预处理，为后续的Wiki构建提供纯文本内容
+  - 支持扫描件的OCR识别，提升文档处理的完整性
+
+```mermaid
+flowchart TD
+Start(["开始上传"]) --> Detect["检测文件类型"]
+Detect --> Text{"文本文件?"}
+Text -- 是 --> ReadText["读取文本内容"]
+Text -- 否 --> PDF{"PDF文件?"}
+PDF -- 是 --> ExtractPDF["pypdf提取文本"]
+PDF -- 否 --> Docx{"Word文件?"}
+Docx -- 是 --> ExtractDocx["python-docx提取文本"]
+Docx -- 否 --> Image{"图片文件?"}
+Image -- 是 --> OCR["多模态OCR识别"]
+Image -- 否 --> Error["不支持的格式"]
+ExtractPDF --> Clean["清理和标准化"]
+ExtractDocx --> Clean
+OCR --> Clean
+ReadText --> Clean
+Clean --> Success["返回纯文本"]
+Error --> Fail["抛出错误"]
+```
+
+**图表来源**
+- [app/utils/extract_upload.py:25-41](file://app/utils/extract_upload.py#L25-L41)
+- [app/utils/extract_upload.py:43-53](file://app/utils/extract_upload.py#L43-L53)
+- [app/utils/extract_upload.py:56-69](file://app/utils/extract_upload.py#L56-L69)
+- [app/utils/extract_upload.py:72](file://app/utils/extract_upload.py#L72)
+- [app/utils/extract_upload.py:83-96](file://app/utils/extract_upload.py#L83-L96)
+
+**章节来源**
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
+
+### 概念合并算法
+- 功能要点
+  - **跨文档去重**：在多个源文档中识别相同概念，避免重复生成
+  - **匹配策略**：支持精确匹配、大小写忽略匹配、别名匹配三种策略
+  - **内容合并**：保留原有内容，追加新的来源信息，避免内容丢失
+  - **元数据更新**：对别名、标签、来源文档ID等元数据进行并集操作
+  - **智能合并**：当新内容完全包含在旧内容中时，跳过重复内容
+- 匹配顺序
+  1) 精确标题匹配
+  2) 大小写忽略标题匹配  
+  3) 新标题命中现有条目的别名
+  4) 新别名与现有条目的标题/别名有交集
+- 合并规则
+  - 别名：取并集并过滤重复
+  - 标签：取并集
+  - 摘要：保留较长者
+  - 内容：追加新的来源小节
+  - 来源文档ID：追加新的ID
+
+```mermaid
+flowchart TD
+Start(["开始概念合并"]) --> FindExisting["查找现有条目"]
+FindExisting --> Exact{"精确标题匹配?"}
+Exact -- 是 --> Merge["合并到现有条目"]
+Exact -- 否 --> CaseIgnore["大小写忽略匹配"]
+CaseIgnore --> AliasMatch{"别名匹配?"}
+AliasMatch -- 是 --> Merge
+AliasMatch -- 否 --> NoMatch["创建新条目"]
+Merge --> UpdateMeta["更新元数据"]
+UpdateMeta --> MergeContent["合并内容"]
+MergeContent --> Save["保存到数据库"]
+NoMatch --> Create["创建新条目"]
+Create --> Save
+Save --> End(["结束"])
+```
+
+**图表来源**
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
+- [app/services/ai_service.py:297-310](file://app/services/ai_service.py#L297-L310)
+- [app/services/ai_service.py:312-364](file://app/services/ai_service.py#L312-L364)
+
+**章节来源**
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
+- [app/services/ai_service.py:297-310](file://app/services/ai_service.py#L297-L310)
+- [app/services/ai_service.py:312-364](file://app/services/ai_service.py#L312-L364)
 
 ### Wiki构建流程与状态机
 - 文章生成
@@ -214,16 +325,19 @@ READY --> IDLE : "重新构建"
 - 输出：AIKBArticle（含标题、别名、摘要、标签、正文、来源文档ID列表）
 - **字符串ID处理**：所有操作均基于字符串类型的AI知识库ID进行过滤和查询
 - **增强错误处理**：对不存在或已删除的源文档进行明确处理，避免构建失败
+- **新增：外部上传件处理**：支持kind=UPLOAD的源文档，先进行文件抽取再进行Wiki构建
 
 ```mermaid
 flowchart TD
 Start(["开始"]) --> LoadSrc["加载源文档 (ai_kb_id: str)"]
 LoadSrc --> Exists{"是否存在且未删除?"}
 Exists -- 否 --> Fail["标记FAILED并记录错误"]
-Exists -- 是 --> Extract["提取纯文本"]
-Extract --> CheckEmpty{"内容是否为空?"}
-CheckEmpty -- 是 --> Fail
-CheckEmpty -- 否 --> CallLLM["调用LLM生成草稿"]
+Exists -- 是 --> CheckKind{"源文档类型?"}
+CheckKind --> Upload{"kind == UPLOAD?"}
+Upload -- 是 --> Extract["extract_text_from_upload(file_path, filename, llm)"]
+Upload -- 否 --> ExtractDoc["提取文档内容"]
+Extract --> CallLLM["调用LLM生成草稿"]
+ExtractDoc --> CallLLM
 CallLLM --> Upsert["upsert_article入库/落盘"]
 Upsert --> Next{"还有源文档?"}
 Next -- 是 --> LoadSrc
@@ -235,11 +349,13 @@ Fail --> Done
 - [app/services/ai_service.py:306-324](file://app/services/ai_service.py#L306-L324)
 - [app/services/ai_service.py:147-171](file://app/services/ai_service.py#L147-L171)
 - [app/services/ai_service.py:214-240](file://app/services/ai_service.py#L214-L240)
+- [app/services/ai_service.py:430-465](file://app/services/ai_service.py#L430-L465)
 
 **章节来源**
 - [app/services/ai_service.py:306-324](file://app/services/ai_service.py#L306-L324)
 - [app/services/ai_service.py:147-171](file://app/services/ai_service.py#L147-L171)
 - [app/services/ai_service.py:214-240](file://app/services/ai_service.py#L214-L240)
+- [app/services/ai_service.py:430-465](file://app/services/ai_service.py#L430-L465)
 
 ### 链接解析算法与跨文档引用
 - 解析步骤
@@ -348,6 +464,7 @@ Svc->>DB : "设置状态 READY / 记录时间"
 ### 蓝图层交互与中间件集成
 - 权限控制：仅知识库拥有者或超级管理员可操作AI知识库
 - 状态查询：提供JSON接口返回知识库状态、错误、最后构建时间、源文档计数与文章数量
+- **新增文件上传端点**：支持多文件上传，自动检测格式并进行处理
 - 中间件：登录、CSRF、数据库扩展在应用工厂中注册
 - **字符串ID处理**：蓝图路由参数均为字符串类型，确保与服务层的一致性
 
@@ -356,22 +473,27 @@ graph LR
 A["蓝图: ai.py"] --> B["权限校验: 仅拥有者/超级管理员"]
 A --> C["状态查询: /ai/<ai_kb_id>/status -> JSON"]
 A --> D["中间件: 登录/CSRF/数据库"]
+A --> E["文件上传: /ai/<ai_kb_id>/sources/upload"]
+E --> F["多格式支持: PDF/Word/文本/图片"]
 ```
 
 **图表来源**
 - [app/blueprints/ai.py:18-25](file://app/blueprints/ai.py#L18-L25)
 - [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/ai.py:153-206](file://app/blueprints/ai.py#L153-L206)
 - [app/__init__.py:39-54](file://app/__init__.py#L39-L54)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
 **章节来源**
 - [app/blueprints/ai.py:18-25](file://app/blueprints/ai.py#L18-L25)
 - [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+- [app/blueprints/ai.py:153-206](file://app/blueprints/ai.py#L153-L206)
 - [app/__init__.py:39-54](file://app/__init__.py#L39-L54)
 - [app/extensions.py:1-17](file://app/extensions.py#L1-L17)
 
 ## 依赖分析
 - 运行时依赖：Flask、SQLAlchemy、OpenAI SDK、python-slugify、markdown、bleach等
+- **新增可选依赖**：pypdf用于PDF处理，python-docx用于Word文档处理，Pillow用于图片处理
 - 可选依赖：当启用RAG时需要chromadb与tiktoken（见配置与注释）
 - 服务层与蓝图层解耦：蓝图仅负责路由与权限，业务逻辑集中在服务层
 - **ID生成工具**：使用app/utils/ids.py提供的短URL友好ID生成器，确保跨层ID一致性
@@ -385,22 +507,28 @@ REQ --> OA["openai"]
 REQ --> SLUG["python-slugify"]
 REQ --> MD["markdown"]
 REQ --> BL["bleach"]
+REQ --> PYPDF["pypdf"]
+REQ --> DOCX["python-docx"]
+REQ --> PIL["Pillow"]
 REQ -. 可选 .-> CHROMA["chromadb"]
 REQ -. 可选 .-> TIK["tiktoken"]
 ID_GEN["app/utils/ids.py"] --> MODELS["app/models/ai_kb.py"]
 CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.py"]
+EXTRACT_UPLOAD["app/utils/extract_upload.py"] --> SVC_AI
 ```
 
 **图表来源**
-- [requirements.txt:1-21](file://requirements.txt#L1-L21)
+- [requirements.txt:1-25](file://requirements.txt#L1-L25)
 - [app/utils/ids.py:14-21](file://app/utils/ids.py#L14-L21)
 - [app/services/config_service.py:1-82](file://app/services/config_service.py#L1-L82)
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
 
 **章节来源**
-- [requirements.txt:1-21](file://requirements.txt#L1-L21)
+- [requirements.txt:1-25](file://requirements.txt#L1-L25)
 - [app/config.py:45-49](file://app/config.py#L45-L49)
 - [app/utils/ids.py:1-21](file://app/utils/ids.py#L1-L21)
 - [app/services/config_service.py:1-82](file://app/services/config_service.py#L1-L82)
+- [app/utils/extract_upload.py:1-126](file://app/utils/extract_upload.py#L1-L126)
 
 ## 性能考虑
 - 文本截断与安全上限：对源文档纯文本进行长度限制，降低LLM输入成本与风险
@@ -411,6 +539,7 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
 - 可选RAG：仅在enable_rag开启时引入向量化与Chroma存储，按需启用
 - **字符串ID优化**：统一的字符串ID类型减少了类型转换开销，提高了查询效率
 - **配置缓存优化**：配置服务使用进程内缓存，避免频繁的DB查询开销
+- **新增性能优化**：概念合并算法采用全量扫描策略，适合个人知识库规模；OCR处理使用多模态LLM，避免本地OCR依赖
 
 **章节来源**
 - [app/services/ai_service.py:147-171](file://app/services/ai_service.py#L147-L171)
@@ -420,6 +549,7 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
 - [app/services/ai_service.py:326-381](file://app/services/ai_service.py#L326-L381)
 - [app/config.py:45-49](file://app/config.py#L45-L49)
 - [app/services/config_service.py:20-31](file://app/services/config_service.py#L20-L31)
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
 
 ## 故障排除指南
 - LLM SDK未安装
@@ -434,6 +564,18 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
   - 现象：源文档内容为空，构建失败
   - 处理：检查源文档内容，确保包含有效文本
   - 参考路径：[app/services/ai_service.py:315-316](file://app/services/ai_service.py#L315-L316)
+- **新增：文件上传格式不支持**
+  - 现象：上传文件被跳过，显示不支持的格式
+  - 处理：检查文件扩展名，确保在支持的格式列表中
+  - 参考路径：[app/utils/extract_upload.py:170-171](file://app/utils/extract_upload.py#L170-L171)
+- **新增：OCR识别失败**
+  - 现象：图片文件无法提取文字内容
+  - 处理：确认使用的模型支持vision功能，检查图片质量
+  - 参考路径：[app/utils/extract_upload.py:88-96](file://app/utils/extract_upload.py#L88-L96)
+- **新增：概念合并冲突**
+  - 现象：多个概念被错误地合并到同一文章
+  - 处理：检查别名设置，确保概念间的区分度足够高
+  - 参考路径：[app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
 - 红链过多
   - 现象：wikilink未解析为目标文章
   - 处理：检查目标标题/别名是否正确，必要时手动修正
@@ -449,7 +591,7 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
 - RAG不可用
   - 现象：启用RAG后仍为纯文本问答
   - 处理：安装chromadb与tiktoken，配置EMBEDDING_MODEL与CHROMA_PATH
-  - 参考路径：[requirements.txt:19-21](file://requirements.txt#L19-L21)，[app/config.py:45-49](file://app/config.py#L45-L49)
+  - 参考路径：[requirements.txt:22-24](file://requirements.txt#L22-L24)，[app/config.py:45-49](file://app/config.py#L45-L49)
 - **字符串ID类型错误**
   - 现象：服务函数调用时报类型错误
   - 处理：确保传递字符串类型的AI知识库ID，不要使用整数ID
@@ -459,17 +601,20 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
 - [app/services/ai_service.py:77-79](file://app/services/ai_service.py#L77-L79)
 - [app/services/ai_service.py:312-313](file://app/services/ai_service.py#L312-L313)
 - [app/services/ai_service.py:315-316](file://app/services/ai_service.py#L315-L316)
+- [app/utils/extract_upload.py:170-171](file://app/utils/extract_upload.py#L170-L171)
+- [app/utils/extract_upload.py:88-96](file://app/utils/extract_upload.py#L88-L96)
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
 - [app/services/ai_service.py:261-288](file://app/services/ai_service.py#L261-L288)
 - [app/services/ai_service.py:374-377](file://app/services/ai_service.py#L374-L377)
 - [app/services/ai_service.py:62-69](file://app/services/ai_service.py#L62-L69)
-- [requirements.txt:19-21](file://requirements.txt#L19-L21)
+- [requirements.txt:22-24](file://requirements.txt#L22-L24)
 - [app/config.py:45-49](file://app/config.py#L45-L49)
 - [app/services/ai_service.py:326](file://app/services/ai_service.py#L326)
 
 ## 结论
 本服务层以Karpathy LLM Wiki方法为核心，结合可选RAG增强，提供了从源文档到可导航知识图谱的完整链路。通过清晰的状态机、健壮的错误恢复、可扩展的LLM封装与后台异步任务，既满足纯文本知识库场景，也为未来向量检索与大规模扩展打下基础。蓝图层与服务层职责分离，便于维护与演进。
 
-**更新** 服务层现已全面采用字符串ID处理模式，确保了与模型层的完全一致性和类型安全性，为系统的稳定性和可维护性提供了重要保障。同时，通过增强的错误处理机制、配置获取回退、空文档处理和改进的日志记录，显著提升了AI知识库构建过程的可靠性和用户体验。
+**更新** 服务层现已全面采用字符串ID处理模式，确保了与模型层的完全一致性和类型安全性，为系统的稳定性和可维护性提供了重要保障。同时，通过增强的错误处理机制、配置获取回退、空文档处理和改进的日志记录，显著提升了AI知识库构建过程的可靠性。**新增功能**：文件上传处理、多模态图像OCR、概念合并算法等核心服务功能，大幅提升了AI知识库的文档处理能力和智能化水平。
 
 ## 附录
 
@@ -480,14 +625,22 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
   - 参数：ai_kb_id（字符串类型）
   - 返回：JSON，包含status、error、last_built_at、sources计数、articles数量
   - 权限：登录用户
-  - 参考路径：[app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
+  - 参考路径：[app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
 - 启动构建
   - 方法：POST
   - 路径：/ai/<ai_kb_id>/build
   - 参数：ai_kb_id（字符串类型），scope（默认仅待处理，传all则重置为PENDING后全量）
   - 返回：重定向至详情页
   - 权限：登录用户（拥有者或超级管理员）
-  - 参考路径：[app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+  - 参考路径：[app/blueprints/ai.py:259-272](file://app/blueprints/ai.py#L259-L272)
+- **新增：文件上传**
+  - 方法：POST
+  - 路径：/ai/<ai_kb_id>/sources/upload
+  - 参数：ai_kb_id（字符串类型），files（多文件上传）
+  - 返回：重定向至源文档列表
+  - 权限：登录用户（拥有者或超级管理员）
+  - 支持格式：PDF、Word、文本、图片
+  - 参考路径：[app/blueprints/ai.py:153-206](file://app/blueprints/ai.py#L153-L206)
 - 文章重生
   - 方法：POST
   - 路径：/ai/<ai_kb_id>/wiki/<slug>/regenerate
@@ -504,8 +657,9 @@ CONF_SVC["app/services/config_service.py"] --> SVC_AI["app/services/ai_service.p
   - 参考路径：[app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
 
 **章节来源**
-- [app/blueprints/ai.py:189-203](file://app/blueprints/ai.py#L189-L203)
-- [app/blueprints/ai.py:173-186](file://app/blueprints/ai.py#L173-L186)
+- [app/blueprints/ai.py:275-289](file://app/blueprints/ai.py#L275-L289)
+- [app/blueprints/ai.py:259-272](file://app/blueprints/ai.py#L259-L272)
+- [app/blueprints/ai.py:153-206](file://app/blueprints/ai.py#L153-L206)
 - [app/blueprints/ai.py:269-278](file://app/blueprints/ai.py#L269-L278)
 - [app/blueprints/ai.py:295-309](file://app/blueprints/ai.py#L295-L309)
 
@@ -526,7 +680,12 @@ string error_msg
 AI_KB_SOURCES {
 int id PK
 string ai_kb_id FK
-int doc_id FK
+string kind
+string doc_id
+string upload_filename
+string upload_path
+string upload_ext
+int upload_bytes
 string status
 string err_msg
 }
@@ -593,3 +752,25 @@ AI_KB_ARTICLES ||--o{ AI_KB_CHUNKS : "包含"
 - [app/services/ai_service.py:62-69](file://app/services/ai_service.py#L62-L69)
 - [app/services/ai_service.py:344-352](file://app/services/ai_service.py#L344-L352)
 - [app/services/config_service.py:20-31](file://app/services/config_service.py#L20-L31)
+
+### 文件上传处理最佳实践
+- **格式支持**：确保requirements.txt中包含必要的依赖库（pypdf、python-docx、Pillow）
+- **文件安全**：使用secure_filename函数确保文件名安全，保留原始扩展名
+- **存储管理**：上传文件存储在instance_path下的ai_uploads目录，支持相对路径存储
+- **错误处理**：对不支持的格式进行跳过处理，并向用户显示警告信息
+- **资源清理**：删除源文档时同步清理对应的上传文件
+
+**章节来源**
+- [app/blueprints/ai.py:153-206](file://app/blueprints/ai.py#L153-L206)
+- [app/blueprints/ai.py:208-229](file://app/blueprints/ai.py#L208-L229)
+- [requirements.txt:19-21](file://requirements.txt#L19-L21)
+
+### 概念合并算法最佳实践
+- **别名设计**：为概念设计丰富的别名，提高匹配准确率
+- **内容质量**：确保源文档内容质量，避免歧义信息影响合并效果
+- **监控指标**：关注合并后的文章质量和链接解析效果
+- **人工审核**：定期检查合并结果，必要时进行人工调整
+
+**章节来源**
+- [app/services/ai_service.py:266-295](file://app/services/ai_service.py#L266-L295)
+- [app/services/ai_service.py:312-364](file://app/services/ai_service.py#L312-L364)

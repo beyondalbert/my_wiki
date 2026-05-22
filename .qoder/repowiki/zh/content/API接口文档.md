@@ -17,7 +17,16 @@
 - [app/extensions.py](file://app/extensions.py)
 - [run.py](file://run.py)
 - [wsgi.py](file://wsgi.py)
+- [app/templates/doc/view.html](file://app/templates/doc/view.html)
+- [app/templates/doc/edit.html](file://app/templates/doc/edit.html)
+- [app/templates/doc/share.html](file://app/templates/doc/share.html)
 </cite>
+
+## 更新摘要
+**变更内容**
+- 更新文档管理API中的删除功能部分，反映UI布局从按钮改为下拉菜单的变更
+- 保持API端点和功能不变，仅更新界面交互描述
+- 强调删除功能仍通过POST /doc/{doc_id}/delete接口提供
 
 ## 目录
 1. [简介](#简介)
@@ -32,7 +41,7 @@
 10. [附录](#附录)
 
 ## 简介
-本项目为“My Wiki”个人知识库系统，提供基于Flask的Web应用与RESTful API能力。本文档面向开发者与集成方，完整梳理所有REST API端点与WebSocket接口（如适用），覆盖用户认证、知识库管理、文档管理、AI知识库构建与聊天对话等模块。文档包含HTTP方法、URL模式、请求参数、响应格式、状态码说明、错误处理策略、认证机制、权限验证、数据验证规则、请求响应示例与客户端调用指南，并解释API版本控制、速率限制与安全考虑。
+本项目为"My Wiki"个人知识库系统，提供基于Flask的Web应用与RESTful API能力。本文档面向开发者与集成方，完整梳理所有REST API端点与WebSocket接口（如适用），覆盖用户认证、知识库管理、文档管理、AI知识库构建与聊天对话等模块。文档包含HTTP方法、URL模式、请求参数、响应格式、状态码说明、错误处理策略、认证机制、权限验证、数据验证规则、请求响应示例与客户端调用指南，并解释API版本控制、速率限制与安全考虑。
 
 ## 项目结构
 后端采用Flask应用工厂模式，通过蓝图组织业务域，服务层封装业务逻辑，模型层定义数据结构，配置与扩展分别负责运行时配置与第三方集成。
@@ -78,12 +87,12 @@ APP --> CFG
 APP --> EXT
 ```
 
-图表来源
+**图表来源**
 - [app/__init__.py:11-74](file://app/__init__.py#L11-L74)
 - [run.py:1-17](file://run.py#L1-L17)
 - [wsgi.py:1-10](file://wsgi.py#L1-L10)
 
-章节来源
+**章节来源**
 - [app/__init__.py:11-74](file://app/__init__.py#L11-L74)
 - [run.py:1-17](file://run.py#L1-L17)
 - [wsgi.py:1-10](file://wsgi.py#L1-L10)
@@ -96,11 +105,11 @@ APP --> EXT
 - AI知识库服务：LLM客户端封装、Wiki构建流程、链接解析、异步构建与重生成、聊天问答。
 - 分享服务：分享令牌生成、有效期控制、撤销与访问计数。
 
-章节来源
+**章节来源**
 - [app/__init__.py:39-74](file://app/__init__.py#L39-L74)
 - [app/services/auth_service.py:21-56](file://app/services/auth_service.py#L21-L56)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
-- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
+- [app/services/doc_service.py:11-130](file://app/services/doc_service.py#L11-L130)
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 - [app/services/share_service.py:15-49](file://app/services/share_service.py#L15-L49)
 
@@ -122,10 +131,10 @@ MODEL --> DB
 SVC --> LLM
 ```
 
-图表来源
+**图表来源**
 - [app/blueprints/auth.py:1-85](file://app/blueprints/auth.py#L1-L85)
 - [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
-- [app/blueprints/doc.py:1-139](file://app/blueprints/doc.py#L1-L139)
+- [app/blueprints/doc.py:1-231](file://app/blueprints/doc.py#L1-L231)
 - [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
 - [app/services/ai_service.py:47-86](file://app/services/ai_service.py#L47-L86)
 
@@ -154,7 +163,7 @@ SVC --> LLM
   - 响应：PNG图像流，设置缓存头防止缓存
   - 状态码：200
 
-章节来源
+**章节来源**
 - [app/blueprints/auth.py:10-85](file://app/blueprints/auth.py#L10-L85)
 - [app/services/auth_service.py:21-56](file://app/services/auth_service.py#L21-L56)
 
@@ -193,7 +202,7 @@ SVC --> LLM
     - 响应：重定向回成员页
     - 权限：仅管理员
 
-章节来源
+**章节来源**
 - [app/blueprints/kb.py:21-141](file://app/blueprints/kb.py#L21-L141)
 - [app/services/kb_service.py:10-80](file://app/services/kb_service.py#L10-L80)
 
@@ -220,6 +229,7 @@ SVC --> LLM
   - 方法与路径：POST /doc/{doc_id}/delete
   - 响应：批量软删除并重定向
   - 权限：具备编辑权限
+  - **更新**：UI布局已调整为下拉菜单形式，位于文档标题右侧的"更多操作"菜单中，包含分享和删除两个选项
 - 分享文档
   - 方法与路径：GET/POST /doc/{doc_id}/share
   - 表单参数：password（可选）、ttl_hours（可选）
@@ -230,10 +240,11 @@ SVC --> LLM
   - 响应：重定向回分享页
   - 权限：具备编辑权限
 
-章节来源
-- [app/blueprints/doc.py:20-139](file://app/blueprints/doc.py#L20-L139)
-- [app/services/doc_service.py:11-81](file://app/services/doc_service.py#L11-L81)
+**章节来源**
+- [app/blueprints/doc.py:57-231](file://app/blueprints/doc.py#L57-L231)
+- [app/services/doc_service.py:11-130](file://app/services/doc_service.py#L11-L130)
 - [app/services/share_service.py:15-49](file://app/services/share_service.py#L15-L49)
+- [app/templates/doc/view.html:189-224](file://app/templates/doc/view.html#L189-L224)
 
 ### AI知识库API
 - 列表AI知识库
@@ -306,14 +317,12 @@ SVC --> LLM
   - 响应：JSON {ok, answer 或 {ok, error}}
   - 权限：仅拥有者或超级管理员；当启用RAG时可进行向量检索增强
 
-章节来源
+**章节来源**
 - [app/blueprints/ai.py:27-279](file://app/blueprints/ai.py#L27-L279)
 - [app/services/ai_service.py:313-408](file://app/services/ai_service.py#L313-L408)
 
 ### WebSocket接口
 - 当前代码库未实现WebSocket接口。若未来需要实时聊天或构建进度推送，可在蓝图中新增WebSocket路由并通过Flask-SocketIO或类似方案接入。
-
-[本节为概念性说明，不直接分析具体文件]
 
 ## 依赖关系分析
 
@@ -330,14 +339,14 @@ APP_INIT --> DOC_BP
 APP_INIT --> AI_BP
 ```
 
-图表来源
+**图表来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
 - [app/blueprints/auth.py:1-85](file://app/blueprints/auth.py#L1-L85)
 - [app/blueprints/kb.py:1-141](file://app/blueprints/kb.py#L1-L141)
-- [app/blueprints/doc.py:1-139](file://app/blueprints/doc.py#L1-L139)
+- [app/blueprints/doc.py:1-231](file://app/blueprints/doc.py#L1-L231)
 - [app/blueprints/ai.py:1-279](file://app/blueprints/ai.py#L1-L279)
 
-章节来源
+**章节来源**
 - [app/__init__.py:56-74](file://app/__init__.py#L56-L74)
 
 ## 性能考虑
@@ -347,7 +356,7 @@ APP_INIT --> AI_BP
 - 文件存储：AI Wiki导出为本地Markdown文件，建议结合CDN或对象存储优化静态资源访问。
 - 上传限制：最大内容长度由配置控制，防止大文件上传导致内存压力。
 
-章节来源
+**章节来源**
 - [app/config.py:23-26](file://app/config.py#L23-L26)
 - [app/config.py:52-54](file://app/config.py#L52-L54)
 - [app/services/ai_service.py:313-345](file://app/services/ai_service.py#L313-L345)
@@ -362,7 +371,7 @@ APP_INIT --> AI_BP
   - 分享失败：私密文档不可分享、过期时间非法。
   - AI构建失败：源文档缺失、外部LLM不可用、线程异常。
 
-章节来源
+**章节来源**
 - [app/__init__.py:76-88](file://app/__init__.py#L76-L88)
 - [app/services/auth_service.py:21-34](file://app/services/auth_service.py#L21-L34)
 - [app/services/share_service.py:17-18](file://app/services/share_service.py#L17-L18)
@@ -374,7 +383,7 @@ APP_INIT --> AI_BP
 ## 附录
 
 ### 认证机制与权限验证
-- 认证方式：基于Flask-Login的会话认证，支持“记住我”。
+- 认证方式：基于Flask-Login的会话认证，支持"记住我"。
 - 权限模型：
   - 公共知识库：任意登录用户可访问。
   - 成员可见：仅成员可访问。
@@ -383,7 +392,7 @@ APP_INIT --> AI_BP
   - 管理权限：仅拥有者。
 - 超级管理员：具备全局管理权限。
 
-章节来源
+**章节来源**
 - [app/services/kb_service.py:10-46](file://app/services/kb_service.py#L10-L46)
 
 ### 数据验证规则
@@ -394,10 +403,10 @@ APP_INIT --> AI_BP
 - 文档隐私：NORMAL/PRIVATE枚举。
 - 可见性：PRIVATE/MEMBERS/PUBLIC枚举。
 
-章节来源
+**章节来源**
 - [app/services/auth_service.py:13-29](file://app/services/auth_service.py#L13-L29)
 - [app/blueprints/kb.py:36-41](file://app/blueprints/kb.py#L36-L41)
-- [app/blueprints/doc.py:34-36](file://app/blueprints/doc.py#L34-L36)
+- [app/blueprints/doc.py:68-76](file://app/blueprints/doc.py#L68-L76)
 
 ### 请求与响应示例（路径指引）
 - 登录
@@ -415,7 +424,7 @@ APP_INIT --> AI_BP
 - 保存文档
   - 请求：POST /doc/{doc_id}/save，JSON {title, content_json, privacy}
   - 响应：{"ok": true, "outline": [...], "updated_at": "iso8601"}
-  - 参考路径：[app/blueprints/doc.py:69-84](file://app/blueprints/doc.py#L69-L84)
+  - 参考路径：[app/blueprints/doc.py:122-146](file://app/blueprints/doc.py#L122-L146)
 - AI知识库构建状态
   - 请求：GET /ai/{ai_kb_id}/status
   - 响应：{"status": "...", "error": "...", "last_built_at": "...", "sources": {...}, "articles": N}
@@ -427,8 +436,32 @@ APP_INIT --> AI_BP
 - CSRF保护：启用CSRF扩展。
 - 生产部署：通过WSGI入口启动，读取环境变量选择配置。
 
-章节来源
+**章节来源**
 - [app/config.py:28-36](file://app/config.py#L28-L36)
 - [app/config.py:60-67](file://app/config.py#L60-L67)
 - [app/__init__.py:39-44](file://app/__init__.py#L39-L44)
 - [wsgi.py:1-10](file://wsgi.py#L1-L10)
+
+### UI布局更新说明
+**更新**：文档管理API中的删除功能UI布局已调整为下拉菜单形式
+
+- 删除功能位置变化
+  - 之前：直接显示删除按钮
+  - 现在：位于文档标题右侧的"更多操作"下拉菜单中
+  - 菜单图标：三个垂直点（⋯）
+  - 菜单项："删除文档"
+
+- 删除功能行为保持不变
+  - API端点：POST /doc/{doc_id}/delete
+  - 功能：批量软删除文档及其所有子文档
+  - 权限：具备编辑权限的用户
+  - 确认对话框：删除前弹出确认提示
+
+- UI交互改进
+  - 更简洁的顶部操作区域
+  - 将删除功能整合到统一的下拉菜单中
+  - 与其他操作（分享、AI知识库加入等）保持一致的菜单设计
+
+**章节来源**
+- [app/templates/doc/view.html:189-224](file://app/templates/doc/view.html#L189-L224)
+- [app/blueprints/doc.py:149-162](file://app/blueprints/doc.py#L149-L162)

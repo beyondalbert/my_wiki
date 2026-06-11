@@ -62,6 +62,10 @@
   <style>
     #editor { min-height: 600px; }
     #editor .toastui-editor-defaultUI { border-radius: 0.5rem; }
+    /* 自定义工具栏项样式 */
+    .tui-popup-fontsize-body button:hover { background: #eef2ff !important; border-color: #a5b4fc !important; }
+    .tui-popup-color-body span:hover { transform: scale(1.25) !important; z-index: 2 !important; position: relative !important; }
+    .tui-popup-color-body span { transition: transform 0.15s ease; }
   </style>
 {% endif %}
 {% endblock %}
@@ -122,7 +126,134 @@
     }
     const holder = document.getElementById('editor');
     if (!holder) { showError('找不到 #editor 容器'); return; }
-    let editor;
+
+    // ── 字号弹窗 ──
+    function _buildFontSizePopupBody() {
+      var wrap = document.createElement('div');
+      wrap.className = 'tui-popup-fontsize-body';
+      wrap.style.cssText = 'padding:6px;display:flex;flex-direction:column;gap:4px;min-width:100px';
+      var sizes = ['12px','14px','16px','18px','20px','24px','30px','36px'];
+      sizes.forEach(function (sz) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = sz.replace('px','');
+        btn.setAttribute('data-font-size', sz);
+        btn.style.cssText = 'padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;cursor:pointer;font-size:' + sz + ';color:#334155;line-height:1.5;text-align:center;width:100%';
+        btn.onmouseenter = function () { this.style.background = '#eef2ff'; this.style.borderColor = '#a5b4fc'; };
+        btn.onmouseleave = function () { this.style.background = '#fff'; this.style.borderColor = '#e2e8f0'; };
+        btn.addEventListener('click', function () { _doFontSize(sz); });
+        wrap.appendChild(btn);
+      });
+      return wrap;
+    }
+
+    // ── 颜色弹窗（色块面板） ──
+    function _buildColorPopupBody() {
+      var wrap = document.createElement('div');
+      wrap.className = 'tui-popup-color-body';
+      wrap.style.cssText = 'padding:8px;display:flex;flex-wrap:wrap;gap:5px;min-width:176px';
+      var colors = [
+        '#000000','#495057','#868e96','#adb5bd',
+        '#e03131','#c92a2a','#f08c00','#e8590c',
+        '#2f9e44','#2b8a3e','#1971c2','#1864ab',
+        '#7048e8','#6741d9','#c2255c','#a61e4d',
+        '#0c8599','#1098ad','#e6a800','#f59f00',
+      ];
+      colors.forEach(function (c) {
+        var swatch = document.createElement('span');
+        swatch.setAttribute('data-color', c);
+        swatch.style.cssText = 'display:inline-block;width:22px;height:22px;border-radius:3px;cursor:pointer;border:1px solid #d0d5dd;background-color:' + c + ';box-sizing:border-box';
+        swatch.onmouseenter = function () { this.style.transform = 'scale(1.2)'; this.style.zIndex = '1'; this.style.position = 'relative'; };
+        swatch.onmouseleave = function () { this.style.transform = 'scale(1)'; };
+        swatch.addEventListener('click', function () { _doTextColor(c); });
+        wrap.appendChild(swatch);
+      });
+      return wrap;
+    }
+
+    var _editorRef = null;
+
+    // ── 获取 ProseMirror 选中的文本 ──
+    function _getPMSelectedText(ed) {
+      try {
+        var me = ed.getCurrentModeEditor();
+        var view = me && me.view;
+        if (view && view.state) {
+          var st = view.state, from = st.selection.from, to = st.selection.to;
+          if (from !== to) return { text: st.doc.textBetween(from, to, ' '), from: from, to: to };
+        }
+      } catch (e) { /* ignore */ }
+      return null;
+    }
+
+    // ── 通过 Markdown 替换应用内联样式 ──
+    function _applyStyleViaMarkdown(ed, styleAttr, value) {
+      var selInfo = _getPMSelectedText(ed);
+      if (!selInfo || !selInfo.text) return false;
+      var md = ed.getMarkdown();
+      // 用 PM 的 from 位置在 md 附近搜索
+      var est = Math.min(selInfo.from, md.length);
+      var searchStart = Math.max(0, est - 80);
+      var searchEnd = Math.min(md.length, est + selInfo.text.length + 80);
+      var idx = md.substring(searchStart, searchEnd).indexOf(selInfo.text);
+      if (idx === -1) {
+        idx = md.indexOf(selInfo.text);
+        if (idx === -1) return false;
+        searchStart = 0;
+      }
+      var actualPos = searchStart + idx;
+      var spanTag = '<span style="' + styleAttr + ':' + value + '">';
+      var newMd = md.substring(0, actualPos)
+        + spanTag + selInfo.text + '</span>'
+        + md.substring(actualPos + selInfo.text.length);
+      ed.setMarkdown(newMd);
+      markDirty();
+
+      // 恢复光标：定位到刚插入的 span 末尾
+      try {
+        var me2 = ed.getCurrentModeEditor();
+        var view2 = me2 && me2.view;
+        if (view2 && selInfo.text) {
+          var st2 = view2.state, targetPos = -1;
+          // 遍历 ProseMirror 节点查找文本（方式比 textContent 更精确）
+          st2.doc.descendants(function (node, pos) {
+            if (targetPos !== -1) return false;
+            if (node.isText && node.text) {
+              // 在原始 from 附近再确认是目标文本
+              if (Math.abs(pos - selInfo.from) < 100 && node.text.indexOf(selInfo.text) !== -1) {
+                targetPos = pos + node.text.indexOf(selInfo.text) + selInfo.text.length;
+                return false;
+              }
+            }
+          });
+          if (targetPos !== -1) {
+            var Sel = st2.selection.constructor;
+            if (Sel.create) {
+              view2.dispatch(st2.tr.setSelection(Sel.create(st2.doc, targetPos)).scrollIntoView());
+              try { ed.focus(); } catch (e3) { /* ignore */ }
+            }
+          }
+        }
+      } catch (e2) { /* 容错 */ }
+
+      return true;
+    }
+
+    // ── 字号处理 ──
+    function _doFontSize(sz) {
+      if (!_editorRef) return;
+      _applyStyleViaMarkdown(_editorRef, 'font-size', sz);
+      try { _editorRef.eventEmitter.emit('closePopup'); } catch (e) { /* ignore */ }
+    }
+
+    // ── 颜色处理 ──
+    function _doTextColor(c) {
+      if (!_editorRef) return;
+      _applyStyleViaMarkdown(_editorRef, 'color', c);
+      try { _editorRef.eventEmitter.emit('closePopup'); } catch (e) { /* ignore */ }
+    }
+
+    var editor;
     try {
       editor = new toastui.Editor({
         el: holder,
@@ -134,7 +265,7 @@
         hideModeSwitch: false,
         initialValue: typeof initialRaw === 'string' ? initialRaw : '',
         placeholder: '在此开始书写… 上方工具栏可一键插入标题/列表/表格/代码块',
-        events: { change: () => markDirty() },
+        events: { change: function () { markDirty(); } },
         hooks: {
           addImageBlobHook: function (blob, callback) {
             var form = new FormData();
@@ -154,11 +285,44 @@
               });
           }
         },
+        customHTMLRenderer: {
+          htmlInline: {
+            span: function (node, context) {
+              return context.entering
+                ? { type: 'openTag', tagName: 'span', attributes: node.attrs }
+                : { type: 'closeTag', tagName: 'span' };
+            }
+          }
+        },
+        toolbarItems: [
+          ['heading', 'bold', 'italic', 'strike'],
+          ['hr', 'quote'],
+          ['ul', 'ol', 'task', 'indent', 'outdent'],
+          ['table', 'image', 'link'],
+          ['code', 'codeblock'],
+          [
+            {
+              name: 'fontSize',
+              tooltip: '字号',
+              text: '字号',
+              popup: { body: _buildFontSizePopupBody(), className: 'tui-popup-fontsize', style: { width: 'auto' } }
+            },
+            {
+              name: 'foreColor',
+              tooltip: '文字颜色',
+              text: 'A',
+              style: { color: '#e03131', fontWeight: '700', textDecoration: 'underline' },
+              popup: { body: _buildColorPopupBody(), className: 'tui-popup-color', style: { width: 'auto' } }
+            }
+          ]
+        ]
       });
+      _editorRef = editor;
     } catch (e) {
       showError('Toast UI Editor 创建失败: ' + (e && e.message || e));
       console.error(e); return;
     }
+
     getPayload = () => editor.getMarkdown();
   }
 

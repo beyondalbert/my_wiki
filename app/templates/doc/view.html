@@ -338,6 +338,30 @@
       usageStatistics: false,
     });
 
+    // ── 图片尺寸：从原始 Markdown 解析 w=/h= ──
+    var imgSizes = {};
+    var sizeRe = /!\[[^\]]*\]\(([^)\s"]+)\s*"([^"]*)"\)/g;
+    var sm;
+    while ((sm = sizeRe.exec(raw)) !== null) {
+      var sw = sm[2].match(/\bw=(\d+)/), sh = sm[2].match(/\bh=(\d+)/);
+      if (sw || sh) imgSizes[sm[1]] = { w: sw ? sw[1] : null, h: sh ? sh[1] : null };
+    }
+
+    // 双 rAF 确保 viewer 渲染完毕后再应用尺寸
+    requestAnimationFrame(function () {
+    requestAnimationFrame(function () {
+      target.querySelectorAll('img').forEach(function (img) {
+        var imgSrc = img.getAttribute('src') || img.src || '';
+        if (imgSrc.indexOf(location.origin) === 0) imgSrc = imgSrc.substring(location.origin.length);
+        var size = imgSizes[imgSrc];
+        if (size) {
+          if (size.w) img.style.width = size.w + 'px';
+          if (size.h) img.style.height = size.h + 'px';
+        }
+      });
+    });
+    });
+
     requestAnimationFrame(function () {
       const headings = target.querySelectorAll('h1, h2, h3');
       const len = Math.min(headings.length, OUTLINE.length);

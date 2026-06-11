@@ -323,7 +323,173 @@
       console.error(e); return;
     }
 
-    getPayload = () => editor.getMarkdown();
+    // ══════ 图片拖拽缩放 ══════
+    function _normSrc(img) {
+      var s = img.getAttribute('src') || img.src || '';
+      if (s.indexOf(location.origin) === 0) s = s.substring(location.origin.length);
+      return s;
+    }
+
+    function _mdImgSizes(md) {
+      var m = {}, re = /!\[[^\]]*\]\(([^)\s"]+)\s*"([^"]*)"\)/g, r;
+      while ((r = re.exec(md)) !== null) {
+        var w = r[2].match(/\bw=(\d+)/), h = r[2].match(/\bh=(\d+)/);
+        if (w || h) m[r[1]] = { w: w ? w[1] : '', h: h ? h[1] : '' };
+      }
+      return m;
+    }
+
+    function _applySizes(m) {
+      holder.querySelectorAll('.ProseMirror img').forEach(function (img) {
+        var s = _normSrc(img), z = m[s];
+        if (z) { if (z.w) img.style.width = z.w + 'px'; if (z.h) img.style.height = z.h + 'px'; }
+      });
+    }
+
+    function _injectSizes(md) {
+      var imgs = holder.querySelectorAll('.ProseMirror img');
+      imgs.forEach(function (img) {
+        var w = parseInt(img.style.width) || 0, h = parseInt(img.style.height) || 0;
+        if (!w && !h) return;
+        var src = _normSrc(img), title = '';
+        if (w) title += 'w=' + w; if (h) title += (title ? ' ' : '') + 'h=' + h;
+        if (!title || !src) return;
+        var esc = src.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        // 标题放在 ) 内部：![alt](url "title")
+        var re = new RegExp('(!\\[[^\\]]*\\]\\()(' + esc + ')(?:\\s*"[^"]*")?(\\))', 'g');
+        md = md.replace(re, function (m2, p1, p2, p3) { return p1 + p2 + ' "' + title + '"' + p3; });
+      });
+      return md;
+    }
+
+    // ── 四个角拖拽手柄 ──
+    var _rh = document.createElement('div');
+    _rh.style.cssText = 'display:none;position:fixed;top:0;left:0;z-index:999;pointer-events:none';
+    ['nw','ne','sw','se'].forEach(function (c) {
+      var d = document.createElement('div');
+      d.className = 'img-grip ' + c;
+      d.style.cssText = 'position:absolute;width:12px;height:12px;background:#4338ca;border:2px solid #fff;border-radius:3px;pointer-events:auto;box-shadow:0 0 4px rgba(0,0,0,0.3)';
+      d.style.cursor = c + '-resize';
+      _rh.appendChild(d);
+    });
+    document.body.appendChild(_rh);
+    var _rhImg = null, _rhCorner = '', _rhSX, _rhSY, _rhSW, _rhSH;
+
+    function _showGrips(img) {
+      var r = img.getBoundingClientRect();
+      ['nw','ne','sw','se'].forEach(function (c) {
+        var g = _rh.querySelector('.' + c);
+        g.style.left = ((c[1] === 'w' ? r.left : r.right) - 6) + 'px';
+        g.style.top = ((c[0] === 'n' ? r.top : r.bottom) - 6) + 'px';
+      });
+      _rh.style.display = 'block'; _rhImg = img;
+    }
+    function _hideGrips() { _rh.style.display = 'none'; _rhImg = null; }
+
+    function _updGrips() { if (_rhImg) _showGrips(_rhImg); }
+
+    _rh.addEventListener('mousedown', function (e) {
+      var g = e.target.closest('.img-grip');
+      if (!g || !_rhImg) return;
+      e.preventDefault(); e.stopPropagation();
+      _rhCorner = g.className.replace('img-grip', '').trim();
+      _rhSX = e.clientX; _rhSY = e.clientY;
+      _rhSW = _rhImg.offsetWidth; _rhSH = _rhImg.offsetHeight;
+      function mv(ev) {
+        var dx = ev.clientX - _rhSX, dy = ev.clientY - _rhSY;
+        var nw = _rhSW, nh = _rhSH;
+        if (_rhCorner[1] === 'e') nw = _rhSW + dx; else if (_rhCorner[1] === 'w') nw = _rhSW - dx;
+        if (_rhCorner[0] === 's') nh = _rhSH + dy; else if (_rhCorner[0] === 'n') nh = _rhSH - dy;
+        if (nw > 10) _rhImg.style.width = nw + 'px';
+        if (nh > 10) _rhImg.style.height = nh + 'px';
+        _updGrips(); markDirty();
+      }
+      function up() {
+        // 同步 DOM 尺寸到 _imgSizeMap
+        var s = _normSrc(_rhImg);
+        if (s) {
+          var pw = parseInt(_rhImg.style.width) || 0, ph = parseInt(_rhImg.style.height) || 0;
+          if (pw || ph) _imgSizeMap[s] = { w: String(pw), h: String(ph) };
+          else delete _imgSizeMap[s];
+        }
+        document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up);
+      }
+      document.addEventListener('mousemove', mv);
+      document.addEventListener('mouseup', up);
+    });
+
+    // ── 点击编辑区图片 → 显示／隐藏手柄 ──
+    document.addEventListener('click', function (e) {
+      if (e.target.closest('.img-grip')) return;
+      if (!e.target.closest('#editor')) { _hideGrips(); return; }
+      // PM 图片可能包在 <span contenteditable="false"> 中
+      var img = e.target.closest('img');
+      if (!img) {
+        var wrap = e.target.closest('.ProseMirror [contenteditable="false"]');
+        if (wrap) img = wrap.querySelector('img');
+      }
+      if (img && img.src) { setTimeout(function () { _showGrips(img); }, 0); }
+      else _hideGrips();
+    });
+    window.addEventListener('scroll', function () { _updGrips(); }, true);
+    window.addEventListener('resize', _updGrips);
+
+    // ── 加载已有尺寸 ──
+    var _imgSizeMap = _mdImgSizes(typeof initialRaw === 'string' ? initialRaw : '');
+    requestAnimationFrame(function () { _applySizes(_imgSizeMap); });
+
+    // ── setMarkdown 后恢复尺寸 ──
+    var _origSetMarkdown = editor.setMarkdown.bind(editor);
+    editor.setMarkdown = function (md) {
+      _origSetMarkdown(md);
+      // 合入 parsed 中没有覆盖的新图片
+      var p = _mdImgSizes(md);
+      Object.keys(p).forEach(function (k) { if (!(k in _imgSizeMap)) _imgSizeMap[k] = p[k]; });
+      requestAnimationFrame(function () { _applySizes(_imgSizeMap); });
+    };
+
+    // ── getPayload：从 DOM 读当前图片尺寸注入 Markdown ──
+    var _origGetMarkdown = editor.getMarkdown.bind(editor);
+    // ── 自行构建 Markdown（绕过 getMarkdown 丢 image 的 bug） ──
+    function _buildMarkdown(view) {
+      var lines = [];
+      view.state.doc.forEach(function (block) {
+        var line = '';
+        block.forEach(function (node) {
+          if (node.type.name === 'text') {
+            line += node.text;
+          } else if (node.type.name === 'image') {
+            line += '![' + (node.attrs.altText || '') + '](' + node.attrs.imageUrl;
+            if (node.attrs.title) line += ' "' + node.attrs.title + '"';
+            line += ')';
+          } else if (node.type.name === 'hardBreak') {
+            line += '\n';
+          }
+        });
+        if (block.type.name === 'heading') {
+          line = '#'.repeat(block.attrs.level || 1) + ' ' + line;
+        }
+        lines.push(line);
+      });
+      return lines.join('\n\n');
+    }
+
+    getPayload = function () {
+      var md = _origGetMarkdown();
+      // 仅当 _origGetMarkdown 丢失了 image 节点时才走自建 Markdown
+      try {
+        var me = editor.getCurrentModeEditor();
+        var v = me && me.view;
+        if (v) {
+          var missing = false;
+          v.state.doc.descendants(function (node) {
+            if (node.type.name === 'image' && md.indexOf(node.attrs.imageUrl) === -1) missing = true;
+          });
+          if (missing) md = _buildMarkdown(v);
+        }
+      } catch (e) { /* fall through */ }
+      return _injectSizes(md);
+    };
   }
 
   async function save() {

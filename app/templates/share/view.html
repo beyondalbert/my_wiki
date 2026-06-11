@@ -61,6 +61,15 @@
     usageStatistics: false,
   });
 
+  // ── 图片尺寸：解析原始 Markdown ──
+  var imgSizes = {};
+  var sizeRe = /!\[[^\]]*\]\(([^)\s"]+)\s*"([^"]*)"\)/g;
+  var sm;
+  while ((sm = sizeRe.exec(md)) !== null) {
+    var sw = sm[2].match(/\bw=(\d+)/), sh = sm[2].match(/\bh=(\d+)/);
+    if (sw || sh) imgSizes[sm[1]] = { w: sw ? sw[1] : null, h: sh ? sh[1] : null };
+  }
+
   // ── 图片灯箱 ──
   var overlay = document.createElement('div');
   overlay.className = 'img-lightbox-overlay';
@@ -86,6 +95,17 @@
   });
 
   requestAnimationFrame(function () {
+    // 应用图片尺寸
+    target.querySelectorAll('img').forEach(function (img) {
+      var imgSrc = img.getAttribute('src') || img.src || '';
+      if (imgSrc.indexOf(location.origin) === 0) imgSrc = imgSrc.substring(location.origin.length);
+      var size = imgSizes[imgSrc];
+      if (size) {
+        if (size.w) img.style.width = size.w + 'px';
+        if (size.h) img.style.height = size.h + 'px';
+      }
+    });
+
     target.addEventListener('click', function (e) {
       var img = e.target.closest('img');
       if (img && img.src) { e.preventDefault(); lbImg.src = img.src; overlay.classList.add('show'); closeBtn.style.display = 'block'; }

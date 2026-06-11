@@ -18,6 +18,26 @@
 {% block head_extra %}
 <link rel="stylesheet" href="{{ url_for('static', filename='vendor/css/toastui-editor.min.css') }}" />
 <script src="{{ url_for('static', filename='vendor/js/toastui-editor-all.min.js') }}"></script>
+<style>
+  .img-lightbox-overlay {
+    display: none; position: fixed; inset: 0; z-index: 9999;
+    background: rgba(0,0,0,0.85); cursor: pointer;
+    align-items: center; justify-content: center;
+  }
+  .img-lightbox-overlay.show { display: flex; }
+  .img-lightbox-overlay img {
+    max-width: 92vw; max-height: 92vh; object-fit: contain;
+    border-radius: 0.5rem; box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    cursor: default;
+  }
+  .img-lightbox-close {
+    position: fixed; top: 16px; right: 24px; z-index: 10000;
+    color: #fff; font-size: 32px; line-height: 1; cursor: pointer;
+    opacity: 0.7; transition: opacity 0.15s;
+    background: none; border: none; padding: 4px 12px;
+  }
+  .img-lightbox-close:hover { opacity: 1; }
+</style>
 {% endblock %}
 
 {% block body_extra %}
@@ -39,6 +59,37 @@
     viewer: true,
     initialValue: md,
     usageStatistics: false,
+  });
+
+  // ── 图片灯箱 ──
+  var overlay = document.createElement('div');
+  overlay.className = 'img-lightbox-overlay';
+  var lbImg = document.createElement('img');
+  overlay.appendChild(lbImg);
+  var closeBtn = document.createElement('button');
+  closeBtn.className = 'img-lightbox-close';
+  closeBtn.innerHTML = '&times;';
+  closeBtn.setAttribute('aria-label', '关闭');
+  document.body.appendChild(overlay);
+  document.body.appendChild(closeBtn);
+
+  function closeLightbox() {
+    overlay.classList.remove('show');
+    closeBtn.style.display = 'none';
+    lbImg.src = '';
+  }
+  overlay.addEventListener('click', closeLightbox);
+  lbImg.addEventListener('click', function (e) { e.stopPropagation(); });
+  closeBtn.addEventListener('click', closeLightbox);
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') closeLightbox();
+  });
+
+  requestAnimationFrame(function () {
+    target.addEventListener('click', function (e) {
+      var img = e.target.closest('img');
+      if (img && img.src) { e.preventDefault(); lbImg.src = img.src; overlay.classList.add('show'); closeBtn.style.display = 'block'; }
+    });
   });
 })();
 </script>

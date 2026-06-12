@@ -63,7 +63,6 @@
     #editor { min-height: 600px; }
     #editor .toastui-editor-defaultUI { border-radius: 0.5rem; }
     /* 自定义工具栏项样式 */
-    .tui-popup-fontsize-body button:hover { background: #eef2ff !important; border-color: #a5b4fc !important; }
     .tui-popup-color-body span:hover { transform: scale(1.25) !important; z-index: 2 !important; position: relative !important; }
     .tui-popup-color-body span { transition: transform 0.15s ease; }
   </style>
@@ -127,26 +126,6 @@
     const holder = document.getElementById('editor');
     if (!holder) { showError('找不到 #editor 容器'); return; }
 
-    // ── 字号弹窗 ──
-    function _buildFontSizePopupBody() {
-      var wrap = document.createElement('div');
-      wrap.className = 'tui-popup-fontsize-body';
-      wrap.style.cssText = 'padding:6px;display:flex;flex-direction:column;gap:4px;min-width:100px';
-      var sizes = ['12px','14px','16px','18px','20px','24px','30px','36px'];
-      sizes.forEach(function (sz) {
-        var btn = document.createElement('button');
-        btn.type = 'button';
-        btn.textContent = sz.replace('px','');
-        btn.setAttribute('data-font-size', sz);
-        btn.style.cssText = 'padding:3px 10px;border:1px solid #e2e8f0;border-radius:4px;background:#fff;cursor:pointer;font-size:' + sz + ';color:#334155;line-height:1.5;text-align:center;width:100%';
-        btn.onmouseenter = function () { this.style.background = '#eef2ff'; this.style.borderColor = '#a5b4fc'; };
-        btn.onmouseleave = function () { this.style.background = '#fff'; this.style.borderColor = '#e2e8f0'; };
-        btn.addEventListener('click', function () { _doFontSize(sz); });
-        wrap.appendChild(btn);
-      });
-      return wrap;
-    }
-
     // ── 颜色弹窗（色块面板） ──
     function _buildColorPopupBody() {
       var wrap = document.createElement('div');
@@ -173,77 +152,113 @@
 
     var _editorRef = null;
 
-    // ── 获取 ProseMirror 选中的文本 ──
-    function _getPMSelectedText(ed) {
+    // ── 带 span 的完整 Markdown 缓存（PM getMarkdown 会丢失 <span>） ──
+    var _fullMd = typeof initialRaw === 'string' ? initialRaw : '';
+
+    function _stripSpans(md) {
+      return md.replace(/<span\s+[^>]*>/g, '').replace(/<\/span>/g, '');
+    }
+
+    // 按需同步：当 _fullMd 中找不到 PM 里的文本时，将新文本并入 _fullMd
+    function _syncFullMd(ed) {
+      var pmMd = ed.getMarkdown();
+      var plain = _stripSpans(_fullMd);
+      if (pmMd === plain) return;
+      // 构建 plain → full 位置映射
+      var posMap = [];
+      var fp = 0;
+      for (var pi = 0; pi < plain.length; pi++) {
+        while (fp < _fullMd.length) {
+          if (_fullMd[fp] === '<' && _fullMd.substring(fp, fp + 5) === '<span') {
+            var gt = _fullMd.indexOf('>', fp);
+            if (gt !== -1) { fp = gt + 1; continue; }
+          }
+          if (_fullMd[fp] === '<' && _fullMd.substring(fp, fp + 7) === '</span>') { fp += 7; continue; }
+          break;
+        }
+        posMap.push(fp);
+        fp++;
+      }
+      // 找最长公共前后缀
+      var pre = 0, suf = 0;
+      while (pre < pmMd.length && pre < plain.length && pmMd[pre] === plain[pre]) pre++;
+      while (suf < pmMd.length - pre && suf < plain.length - pre && pmMd[pmMd.length - 1 - suf] === plain[plain.length - 1 - suf]) suf++;
+      // 映射到 _fullMd 中的位置并替换
+      var fPre = pre < posMap.length ? posMap[pre] : _fullMd.length;
+      var fSuf = (plain.length - suf) < posMap.length ? posMap[plain.length - suf] : _fullMd.length;
+      _fullMd = _fullMd.substring(0, fPre) + pmMd.substring(pre, pmMd.length - suf) + _fullMd.substring(fSuf);
+    }
+
+    // ── 根据 PM 选择逐文本段应用内联样式（用 _fullMd 合并 span） ──
+    function _applyStyleViaMarkdown(ed, styleAttr, value) {
+      var segs = [];
       try {
         var me = ed.getCurrentModeEditor();
         var view = me && me.view;
         if (view && view.state) {
           var st = view.state, from = st.selection.from, to = st.selection.to;
-          if (from !== to) return { text: st.doc.textBetween(from, to, ' '), from: from, to: to };
+          if (from < to) {
+            st.doc.nodesBetween(from, to, function (node, pos) {
+              if (node.isText && node.text) {
+                var s = Math.max(from, pos), e = Math.min(to, pos + node.nodeSize);
+                var t = node.text.slice(s - pos, e - pos);
+                if (t) segs.push({ text: t, pos: s });
+              }
+            });
+          }
         }
-      } catch (e) { /* ignore */ }
-      return null;
-    }
+      } catch (ex) { /* 容错 */ }
+      if (!segs.length) return false;
 
-    // ── 通过 Markdown 替换应用内联样式 ──
-    function _applyStyleViaMarkdown(ed, styleAttr, value) {
-      var selInfo = _getPMSelectedText(ed);
-      if (!selInfo || !selInfo.text) return false;
-      var md = ed.getMarkdown();
-      // 用 PM 的 from 位置在 md 附近搜索
-      var est = Math.min(selInfo.from, md.length);
-      var searchStart = Math.max(0, est - 80);
-      var searchEnd = Math.min(md.length, est + selInfo.text.length + 80);
-      var idx = md.substring(searchStart, searchEnd).indexOf(selInfo.text);
-      if (idx === -1) {
-        idx = md.indexOf(selInfo.text);
-        if (idx === -1) return false;
-        searchStart = 0;
+      // 确保 _fullMd 包含当前 PM 文本
+      _syncFullMd(ed);
+      var md = _fullMd;
+      var updated = false;
+      for (var i = segs.length - 1; i >= 0; i--) {
+        var seg = segs[i];
+        var est = Math.min(seg.pos, md.length);
+        var ss = Math.max(0, est - 80);
+        var se = Math.min(md.length, est + seg.text.length + 80);
+        var idx = md.substring(ss, se).indexOf(seg.text);
+        if (idx === -1) { idx = md.indexOf(seg.text); if (idx === -1) continue; ss = 0; }
+        var ap = ss + idx;
+        var before = md.substring(0, ap), after = md.substring(ap + seg.text.length);
+        var sb = before.match(/<span\s+style="([^"]*)"\s*>$/);
+        var sa = after.match(/^<\/span>/);
+        if (sb && sa) {
+          var cur = sb[1], map = {};
+          cur.split(';').forEach(function (s) { var kv = s.split(':'); if (kv.length === 2) map[kv[0].trim()] = kv[1].trim(); });
+          map[styleAttr] = value;
+          var merged = Object.keys(map).map(function (k) { return k + ':' + map[k]; }).join(';');
+          md = before.substring(0, before.length - sb[0].length) + '<span style="' + merged + '">' + seg.text + '</span>' + after.substring(sa[0].length);
+        } else {
+          md = before + '<span style="' + styleAttr + ':' + value + '">' + seg.text + '</span>' + after;
+        }
+        updated = true;
       }
-      var actualPos = searchStart + idx;
-      var spanTag = '<span style="' + styleAttr + ':' + value + '">';
-      var newMd = md.substring(0, actualPos)
-        + spanTag + selInfo.text + '</span>'
-        + md.substring(actualPos + selInfo.text.length);
-      ed.setMarkdown(newMd);
+      if (!updated) return false;
+
+      _fullMd = md;
+      ed.setMarkdown(md);
       markDirty();
 
-      // 恢复光标：定位到刚插入的 span 末尾
       try {
         var me2 = ed.getCurrentModeEditor();
         var view2 = me2 && me2.view;
-        if (view2 && selInfo.text) {
-          var st2 = view2.state, targetPos = -1;
-          // 遍历 ProseMirror 节点查找文本（方式比 textContent 更精确）
+        if (view2) {
+          var st2 = view2.state, last = segs[segs.length - 1], tpos = -1;
           st2.doc.descendants(function (node, pos) {
-            if (targetPos !== -1) return false;
-            if (node.isText && node.text) {
-              // 在原始 from 附近再确认是目标文本
-              if (Math.abs(pos - selInfo.from) < 100 && node.text.indexOf(selInfo.text) !== -1) {
-                targetPos = pos + node.text.indexOf(selInfo.text) + selInfo.text.length;
-                return false;
-              }
-            }
+            if (tpos !== -1) return false;
+            if (node.isText && node.text && node.text.indexOf(last.text) !== -1) { tpos = pos + node.text.indexOf(last.text) + last.text.length; return false; }
           });
-          if (targetPos !== -1) {
+          if (tpos !== -1) {
             var Sel = st2.selection.constructor;
-            if (Sel.create) {
-              view2.dispatch(st2.tr.setSelection(Sel.create(st2.doc, targetPos)).scrollIntoView());
-              try { ed.focus(); } catch (e3) { /* ignore */ }
-            }
+            if (Sel.create) { view2.dispatch(st2.tr.setSelection(Sel.create(st2.doc, tpos)).scrollIntoView()); try { ed.focus(); } catch (ex3) {} }
           }
         }
-      } catch (e2) { /* 容错 */ }
+      } catch (ex2) { /* 容错 */ }
 
       return true;
-    }
-
-    // ── 字号处理 ──
-    function _doFontSize(sz) {
-      if (!_editorRef) return;
-      _applyStyleViaMarkdown(_editorRef, 'font-size', sz);
-      try { _editorRef.eventEmitter.emit('closePopup'); } catch (e) { /* ignore */ }
     }
 
     // ── 颜色处理 ──
@@ -301,12 +316,6 @@
           ['table', 'image', 'link'],
           ['code', 'codeblock'],
           [
-            {
-              name: 'fontSize',
-              tooltip: '字号',
-              text: '字号',
-              popup: { body: _buildFontSizePopupBody(), className: 'tui-popup-fontsize', style: { width: 'auto' } }
-            },
             {
               name: 'foreColor',
               tooltip: '文字颜色',
@@ -441,6 +450,7 @@
     // ── setMarkdown 后恢复尺寸 ──
     var _origSetMarkdown = editor.setMarkdown.bind(editor);
     editor.setMarkdown = function (md) {
+      _fullMd = md;
       _origSetMarkdown(md);
       // 合入 parsed 中没有覆盖的新图片
       var p = _mdImgSizes(md);
@@ -475,8 +485,10 @@
     }
 
     getPayload = function () {
-      var md = _origGetMarkdown();
-      // 仅当 _origGetMarkdown 丢失了 image 节点时才走自建 Markdown
+      // 先同步最新 PM 文本到 _fullMd
+      try { _syncFullMd(editor); } catch (e) {}
+      var md = _fullMd;
+      // 检查 PM 中是否有 image 在 _fullMd 中缺失
       try {
         var me = editor.getCurrentModeEditor();
         var v = me && me.view;
